@@ -1,6 +1,6 @@
 # Udacity Full Stack (In progress!)
 
-This repository is meant to show all of my Udacity's Full Stack Nanodegree project submissions.
+This repository is meant to show all of my Udacity's Full Stack Nanodegree project submissions. All of its content can be viewed in [this](https://riusuky.github.io/udacity-full-stack/) hosted version.
 
 ## Getting Started
 

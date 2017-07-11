@@ -10,6 +10,6 @@ The website can be generated and opened by running the `entertainment_center.py`
 
 Once you run the script, the generated website will be located at the projects root named `index.html`.
 
-## APIs Used
+## The Movie DB API
 
 This project uses the [The Movie DB](https://www.themoviedb.org) API to retrieve the current popular movies that are listed in the generated website.
