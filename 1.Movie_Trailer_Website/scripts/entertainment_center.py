@@ -7,6 +7,7 @@ TMDB_API_KEY = 'bd8bbad27dd75e98097e8012e05735cb'
 
 tmdb_connection = httplib.HTTPSConnection('api.themoviedb.org')
 
+
 def tmdb_api_get(connection, endpoint, payload):
     connection.request("GET", endpoint+'?api_key='+TMDB_API_KEY, payload)
     response = tmdb_connection.getresponse()
@@ -14,19 +15,24 @@ def tmdb_api_get(connection, endpoint, payload):
     if response.status == 200:
         return json.loads(response.read().decode('utf-8'))
     else:
-        print('Could not retrieve data for endpoint "'+endpoint+'". Error: '+response.reason)
+        print('Could not retrieve data for endpoint "{}". '
+              'Error: {}'.format(endpoint, response.reason))
         return None
 
+
 def tmdb_get_movie_youtube_video(connection, movie_id):
-    movies_result = tmdb_api_get(connection, '/3/movie/{}/videos'.format(movie_id), '{}')
+    movies_result = tmdb_api_get(connection,
+                                 '/3/movie/{}/videos'.format(movie_id), '{}')
 
     if movies_result is not None:
         for movie in movies_result['results']:
             if movie['site'].lower() == 'youtube':
                 movie_key = movie['key']
-                # Quick hack to avoid selecting a video with a invalid youtube key
+                # Quick hack to avoid selecting a video with a
+                # invalid youtube key
                 if len(movie_key) >= 5:
-                    return 'https://www.youtube.com/watch?v={}'.format(movie['key'])
+                    return 'https://www.youtube.com'\
+                        '/watch?v={}'.format(movie['key'])
 
         return None
     else:
@@ -42,7 +48,8 @@ try:
 
     if tmdb_config is not None:
         tmdb_image_config = tmdb_config['images']
-        tmdb_base_poster_url = tmdb_image_config['base_url']+tmdb_image_config['poster_sizes'][-2]
+        tmdb_base_poster_url = tmdb_image_config['base_url']\
+            + tmdb_image_config['poster_sizes'][-2]
     else:
         raise Exception
 
@@ -54,9 +61,8 @@ try:
 
         for i in range(15):
             movie = popular_list[i]
-            movie_youtube_url = tmdb_get_movie_youtube_video(tmdb_connection, movie['id'])
-
-            # print('title: {} | {} | {}'.format(movie['title'], movie['id'], movie_youtube_url))
+            movie_youtube_url = tmdb_get_movie_youtube_video(tmdb_connection,
+                                                             movie['id'])
 
             if movie_youtube_url is not None:
                 movie_list.append(media.Movie(
