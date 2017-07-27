@@ -17,8 +17,10 @@ def run_query(query):
         print(error.pgerror)
         return None
     else:
-        return cursor.fetchall()
-        forum_db.close()
+        result = cursor.fetchall()
+        news_connection.close()
+
+        return result
 
 
 def format_query(row_format, header_format, header, rows):
@@ -30,8 +32,6 @@ def format_query(row_format, header_format, header, rows):
 
     for row in rows:
         output += row_format.format(row[0], row[1])
-
-    print(output)
 
     return output
 
@@ -70,7 +70,7 @@ def get_most_popular_authors():
 def get_unlucky_days():
     """Returns the days that had article request fails percentage higher
     than 1%."""
-    query = """SELECT date,
+    query = """SELECT to_char(date, 'FMMonth FMDD, YYYY') as date,
                       error
              FROM request_errors_per_dar
              WHERE error > 0.01;"""
@@ -82,17 +82,32 @@ def get_unlucky_days():
         run_query(query))
 
 with open('output.txt', 'w') as output_file:
-    output_file.write(
-        'What are the most popular three articles of all time?\n')
-    output_file.write(get_most_popular_articles())
+    popular_articles_question = 'What are the most popular ' \
+                                'three articles of all time?\n'
+    popular_articles = get_most_popular_articles()
+    print(popular_articles_question)
+    print(popular_articles)
+
+    output_file.write(popular_articles_question)
+    output_file.write(popular_articles)
     output_file.write('\n\n')
 
-    output_file.write(
-        'Who are the most popular article authors of all time?\n')
-    output_file.write(get_most_popular_authors())
+    popular_authors_question = 'Who are the most popular article ' \
+                               'authors of all time?\n'
+    popular_authors = get_most_popular_authors()
+    print(popular_authors_question)
+    print(popular_authors)
+
+    output_file.write(popular_authors_question)
+    output_file.write(popular_authors)
     output_file.write('\n\n')
 
-    output_file.write(
-        'On which days did more than 1% of requests lead to errors?\n')
-    output_file.write(get_unlucky_days())
+    unlucky_days_question = 'On which days did more than 1% ' \
+                            'of requests lead to errors?\n'
+    unlucky_days = get_unlucky_days()
+    print(unlucky_days_question)
+    print(unlucky_days)
+
+    output_file.write(unlucky_days_question)
+    output_file.write(unlucky_days)
     output_file.write('\n\n')

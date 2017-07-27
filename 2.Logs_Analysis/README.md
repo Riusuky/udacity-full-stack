@@ -4,7 +4,7 @@ This project consists of a python script that requests data from a article news 
 
 ## Getting Started
 
-This project requires the user to have a [PostgreSQL](https://www.postgresql.org/) database server set up and running.
+This project requires the user to have a [PostgreSQL](https://www.postgresql.org/) database server set up and running. To set up the development environment I used [VirtualBox](https://www.virtualbox.org/) and [Vagrant](https://www.vagrantup.com/).
 
 Before running any script, you need to create the `news` database in which we will be connecting to. To do that, enter the database terminal and run `CREATE DATABASE news`.
 
