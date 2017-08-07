@@ -1,12 +1,18 @@
 import sys
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import CheckConstraint
 
 from sqlalchemy.ext.declarative import declarative_base
 
 from sqlalchemy.orm import relationship, backref
 
 from sqlalchemy import create_engine
+
+import logging
+
+logging.basicConfig()
+logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 
 Base = declarative_base()
@@ -16,11 +22,15 @@ class Category(Base):
     __tablename__ = 'categories'
 
     id = Column(Integer, primary_key = True)
-    name = Column(String(255), nullable = False)
+    name = Column(String(255), CheckConstraint("name <> ''"), nullable = False)
 
     items = relationship(
         'Item',
-        back_populates = 'category')
+        back_populates = 'category',
+        cascade = 'all, delete-orphan')
+
+    def tojson(self):
+        return {'id': self.id, 'name': self.name}
 
 
 class Image(Base):
@@ -34,10 +44,10 @@ class Item(Base):
     __tablename__ = 'items'
 
     id = Column(Integer, primary_key = True)
-    name = Column(String(255), nullable = False)
+    name = Column(String(255), CheckConstraint("name <> ''"), nullable = False)
     description = Column(String)
-    category_id = Column(Integer, ForeignKey('categories.id'))
-    image_id = Column(Integer, ForeignKey('images.id'))
+    category_id = Column(Integer, ForeignKey('categories.id', ondelete='CASCADE'), nullable = False)
+    image_id = Column(Integer, ForeignKey('images.id'), nullable = True)
     created_on = Column(DateTime, default = func.now())
 
     category = relationship(
@@ -46,6 +56,24 @@ class Item(Base):
 
     image = relationship('Image')
 
+    def tojson(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'category_id': self.category_id,
+            'image_id': self.image_id,
+            'created_on': self.created_on}
+
 
 engine = create_engine('postgresql:///udacity_catalog')
 Base.metadata.create_all(engine)
+
+
+class Response():
+    def __init__(self, response = {}, error = None):
+        self.response = response
+        self.error = error
+
+    def tojson(self):
+        return {'response': self.response, 'error': self.error}
