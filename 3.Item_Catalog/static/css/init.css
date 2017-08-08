@@ -1,0 +1,36 @@
+/* Sizing */
+nav,
+header,
+section,
+footer,
+aside,
+article,
+div,
+p,
+figure,
+address,
+img,
+main,
+input {
+    box-sizing: border-box;
+}
+
+body,
+h1,
+h2,
+h3,
+h4,
+p,
+figure,
+ul,
+button {
+    margin: 0;
+    padding: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+    font-weight: normal;    
+}

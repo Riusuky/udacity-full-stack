@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title>Item Catalog</title>
+
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/normalize.min.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/init.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+        <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+        <script src="https://apis.google.com/js/api:client.js"></script>
+    </head>
+    <body>
+        <header class="header">
+            <h1 class="header__title">Item Catalog</h1>
+
+            <div class="header__user-container">
+                <h3 class="header__username"></h3>
+                <button id="google-login-button" class="header__login-button" type="button" name="button">
+                    <img class="header__login-img" src="{{ url_for('static', filename='img/btn_google_light_normal_ios.svg') }}" alt="Google logo">
+                    <span class="header__login-text">Sign in</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="main">
+            <aside class="menu-list">
+                <header class="menu-list__header">
+                    <h2>Categories</h2>
+                </header>
+
+                <ul class="menu-list__item-container">
+                    <li class="menu-list__item">A</li>
+                    <li class="menu-list__item">B</li>
+                    <li class="menu-list__item">C</li>
+                </ul>
+            </aside>
+            <section class="item-list">
+                <header class="item-list__header">
+                    <h2>Recent Items</h2>
+                </header>
+
+                <ul class="item-list__item-container">
+                    <li class="item-list__item">A</li>
+                    <li class="item-list__item">B</li>
+                    <li class="item-list__item">C</li>
+                </ul>
+            </section>
+        </main>
+
+        <script>
+            gapi.load('auth2', function(){
+                var user = null;
+
+                var $username = $('.header__username');
+                var $userPicture = $('.header__login-img');
+                var $loginButtonText = $('.header__login-text');
+
+                function signInToBackend(id_token) {
+                    $.ajax({
+                        type: 'POST',
+                        url: '/gconnect?state={{STATE}}',
+                        processData: false,
+                        data: id_token,
+                        contentType: 'application/octet-stream; charset=utf-8'
+                    }).done(function(result) {
+                        $loginButtonText.text('Sign out');
+
+                        $username.toggleClass('visible');
+                        $username.text(result.response.user_name);
+
+                        $userPicture.attr('src', result.response.user_picture);
+                    });
+                }
+
+                function signIn() {
+                    auth2.signIn().then(
+                        function(googleUser) {
+                            user = googleUser;
+
+                            var id_token = googleUser.getAuthResponse().id_token;
+
+                            console.log(id_token);
+
+                            signInToBackend(id_token);
+                        },
+                        function(error) {
+                            window.alert('Failed to log in: '+JSON.stringify(error, undefined, 2));
+                        }
+                    );
+                }
+
+                function signOut() {
+                    $.ajax({
+                        type: 'POST',
+                        url: '/gdisconnect?state={{STATE}}',
+                    }).done(function(result) {
+                        auth2.signOut().then(
+                            function() {
+                                $loginButtonText.text('Sign in');
+
+                                $username.toggleClass('visible');
+
+                                $userPicture.attr('src', '{{ url_for('static', filename='img/btn_google_light_normal_ios.svg') }}');
+                            },
+                            function(error) {
+                                window.alert('Failed to log out: '+JSON.stringify(error, undefined, 2));
+                            }
+                        );
+                    }).fail(function(error) {
+                        window.alert('Failed to log out: '+JSON.stringify(error, undefined, 2));
+                    });
+                }
+
+                auth2 = gapi.auth2.init({
+                    client_id: '1014623565180-lm2sl4gftjv5r8jhgikg0ti9lcldol8c.apps.googleusercontent.com',
+                    cookiepolicy: 'single_host_origin',
+                    scope: 'profile email'
+                });
+
+                auth2.then(
+                    function() {
+                        if(auth2.isSignedIn.get()) {
+                            user = auth2.currentUser.get();
+
+                            signInToBackend(user.getAuthResponse().id_token);
+                        }
+
+                        $('#google-login-button').on('click', function() {
+                            if(user && user.isSignedIn()) {
+                                signOut();
+                            }
+                            else {
+                                signIn();
+                            }
+                        });
+                    },
+                    function(error) {
+                        window.alert('Failed to initialize google oauth: '+JSON.stringify(error, undefined, 2));
+                    }
+                );
+            });
+        </script>
+    </body>
+</html>

@@ -1,17 +1,25 @@
 from redis import Redis
 
+from oauth2client import client, crypt
 
 import time, sys
 from functools import update_wrapper
-from flask import request, g
-from flask import Flask, jsonify
+from flask import request, g, make_response
+from flask import Flask, jsonify, render_template
 
-from models import Category, Image, Item, Response, engine
+from models import User, Category, Image, Item, Response, engine
 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy.exc import DataError, InternalError, IntegrityError, InvalidRequestError
+from sqlalchemy.exc import DataError
+from sqlalchemy.exc import InternalError
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import InvalidRequestError
+
+from flask import session as login_session
+import random
+import string
 
 redis = Redis()
 
@@ -21,6 +29,54 @@ db_session.configure(bind=engine)
 session = db_session()
 
 app = Flask(__name__)
+
+def generate_state():
+    return ''.join(random.choice(string.ascii_uppercase + string.digits)
+        for x in range(32))
+
+
+def requires_authentication(f):
+    def decorator(*args, **kwargs):
+        if 'userid' not in login_session:
+            return (jsonify({'data':'Request requires authentication','error':'401'}),401)
+
+        return f(*args, **kwargs)
+
+    return update_wrapper(decorator, f)
+
+
+def check_authorization(userid):
+    if 'userid' in login_session:
+        return login_session['userid'] == userid
+
+    return False
+
+def get_user(email):
+    try:
+        return session.query(User).filter(
+            User.email == email).one()
+    except NoResultFound:
+        return None
+    except:
+        return None
+
+def add_user(email, name):
+    try:
+        new_user = User(email = email, name = name)
+
+        session.add(new_user)
+        session.commit()
+
+        return new_user
+    except IntegrityError:
+        session.rollback()
+        return None
+    except InvalidRequestError as e:
+        print(e)
+        return None
+    except:
+        print("Unexpected error:", sys.exc_info()[0])
+        return None
 
 def get_categories(id = None):
     if id is not None:
@@ -42,16 +98,20 @@ def get_categories(id = None):
         return Response(category_list) if len(category_list) > 0 \
             else Response(error = 'No result found')
 
+@requires_authentication
 def add_category(name):
+    owner_id = login_session['userid']
+
     try:
-        session.add(Category(name = name))
+        session.add(Category(name = name, owner_id = owner_id))
         session.commit()
 
         return Response('Success')
     except IntegrityError:
         session.rollback()
         return Response(
-            error = 'Invalid new category name. (name: {})'.format(name))
+            error = 'Invalid new category parameters. '
+            '(name: {}, owner_id: {})'.format(name, owner_id))
     except InvalidRequestError as e:
         print(e)
         return Response(error = 'Failed to add new category')
@@ -59,13 +119,18 @@ def add_category(name):
         print("Unexpected error:", sys.exc_info()[0])
         return Response(error = 'Failed to add new category')
 
-
+@requires_authentication
 def delete_category(id):
     try:
-        session.delete(session.query(Category).filter(Category.id == id).one())
-        session.commit()
+        category = session.query(Category).filter(Category.id == id).one()
 
+        if not check_authorization(category.owner_id):
+            return (jsonify({'data':'Permission denied','error':'401'}),401)
+
+        session.delete(category)
+        session.commit()
         return Response('Success')
+
     except DataError:
         return Response(error = 'Category id is not an integer')
     except NoResultFound:
@@ -111,12 +176,16 @@ def get_items(id = None):
         return Response(item_list) if len(item_list) > 0\
             else Response(error = 'No result found')
 
+@requires_authentication
 def add_item(name, category_id, description = None, image_id = None):
+    owner_id = login_session['userid']
+
     try:
         session.add(
             Item(
                 name = name,
                 description = description,
+                owner_id = owner_id,
                 category_id = category_id,
                 image_id = image_id))
         session.commit()
@@ -129,8 +198,13 @@ def add_item(name, category_id, description = None, image_id = None):
                         '(name: {}, '
                         'description: {}, '
                         'category_id: {}, '
+                        'owner_id: {}'
                         'image_id: {})'
-                        .format(name, description, category_id, image_id))
+                        .format(name,
+                            description,
+                            category_id,
+                            owner_id,
+                            image_id))
     except InvalidRequestError as e:
         print(e)
         return Response(error = 'Failed to add new item')
@@ -138,6 +212,7 @@ def add_item(name, category_id, description = None, image_id = None):
         print("Unexpected error:", sys.exc_info()[0])
         return Response(error = 'Failed to add new item')
 
+@requires_authentication
 def update_item(id, name = None, category_id = None, description = None, image_id = None):
     try:
         target = session.query(Item).filter(Item.id == id).one()
@@ -146,6 +221,9 @@ def update_item(id, name = None, category_id = None, description = None, image_i
     except:
         return Response(error = 'Unknown error')
     else:
+        if not check_authorization(target.owner_id):
+            return (jsonify({'data':'Permission denied','error':'401'}),401)
+
         updated = False
 
         if name and (target.name != name):
@@ -190,10 +268,15 @@ def update_item(id, name = None, category_id = None, description = None, image_i
         else:
             return Response('Item has not changed')
 
-
+@requires_authentication
 def delete_item(id):
     try:
-        session.delete(session.query(Item).filter(Item.id == id).one())
+        target = session.query(Item).filter(Item.id == id).one()
+
+        if not check_authorization(target.owner_id):
+            return (jsonify({'data':'Permission denied','error':'401'}),401)
+
+        session.delete(target)
         session.commit()
 
         return Response('Success')
@@ -265,12 +348,59 @@ def inject_x_rate_headers(response):
 @app.route('/')
 @ratelimit(limit=30, per=60 * 1)
 def index():
-    return 'Index'
+    state =  generate_state()
+    print(login_session['state'])
+    print(state)
+    login_session['state'] = state
+
+    return render_template('index.html', STATE=state)
 
 @app.route('/category')
 @ratelimit(limit=30, per=60 * 1)
 def page_category():
-    return 'Category'
+    state =  generate_state()
+    login_session['state'] = state
+
+    return render_template('index.html', STATE=state)
+
+@app.route('/gconnect', methods=['POST'])
+@ratelimit(limit=30, per=60 * 1)
+def gconnect():
+    if request.args.get('state') != login_session['state']:
+        return (jsonify({'data':'Invalid state parameter','error':'401'}),401)
+
+    try:
+        idinfo = client.verify_id_token(request.data, '1014623565180-lm2sl4gftjv5r8jhgikg0ti9lcldol8c.apps.googleusercontent.com')
+
+        if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
+            raise crypt.AppIdentityError("Wrong issuer.")
+    except crypt.AppIdentityError:
+        return (jsonify({'data':'Invalid authentication issuer','error':'401'}),401)
+
+    print(idinfo)
+
+    user = get_user(idinfo['email'])
+
+    if user is None:
+        user = add_user(idinfo['email'], idinfo['name'])
+
+        if user is None:
+            return (jsonify({'data':'Internal Error','error':'500'}),500)
+
+    login_session['userid'] = user.id
+
+    return jsonify(Response({'user_name': idinfo['name'], 'user_picture': idinfo['picture']}).tojson())
+
+@app.route('/gdisconnect', methods=['POST'])
+@ratelimit(limit=30, per=60 * 1)
+@requires_authentication
+def gdisconnect():
+    if request.args.get('state') != login_session['state']:
+        return (jsonify({'data':'Invalid state parameter','error':'401'}),401)
+        
+    del login_session['userid']
+
+    return jsonify(Response('User disconnected successfully').tojson())
 
 @app.route('/api/category',
     defaults={'category': None},
@@ -336,5 +466,6 @@ def api_item(item):
             Response(error = 'Method is not yet implemented').tojson())
 
 if __name__ == '__main__':
-	app.debug = True
-	app.run(host = '0.0.0.0', port = 5000)
+    app.secret_key = 'i3Ldm4dv8c9sBsc45A3vx6sO3plsn'
+    app.debug = True
+    app.run(host = '0.0.0.0', port = 5000)
