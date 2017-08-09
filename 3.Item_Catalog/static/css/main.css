@@ -1,7 +1,24 @@
+/* General */
 body {
     font-family: sans-serif;
+    overflow: hidden;
 }
 
+li {
+    list-style: none;
+}
+
+
+/* Layout */
+body {
+    display: flex;
+    flex-flow: column nowrap;
+    height: 100vh;
+}
+
+
+
+/* Header */
 .header {
     padding: 15px 50px;
     display: flex;
@@ -10,6 +27,7 @@ body {
     align-items: center;
     background-color: #50a5de;
     box-shadow: 0 0 5px 1px black;
+    z-index: 2;
 }
 
 .header__title {
@@ -60,4 +78,229 @@ body {
 
 .header__login-text {
     flex: 1;
+}
+
+
+/* Main */
+.main {
+    display: flex;
+    flex-flow: row nowrap;
+    flex: 1;
+}
+
+.menu-list {
+    background-color: #deac50;
+    color: white;
+    box-shadow: 1px 0 5px #825f1e;
+    z-index: 1;
+    display: flex;
+    flex-flow: column nowrap;
+}
+
+.menu-list hr {
+    width: 100%;
+}
+
+.menu-list__header {
+    padding: 15px 15px 0 15px;
+    text-align: center;
+}
+
+.menu-list__item-container {
+    display: flex;
+    flex-flow: column nowrap;
+    align-items: flex-end;
+    overflow: auto;
+}
+
+.menu-list__item {
+    padding: 10px 15px;
+    width: 100%;
+    display: flex;
+    flex-flow: row nowrap;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-shrink: 0;
+}
+
+.menu-list__delete-button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.4em;
+    padding: 0 15px 0 0;
+    outline: none;
+    padding: 4px;
+    border-radius: 8px;
+}
+
+.menu-list__delete-button:hover {
+    box-shadow: 1px 1px 2px #9a7c45;
+}
+
+.menu-list__delete-button:active {
+    background: white;
+    color: #deac50;
+}
+
+.menu-list__delete-button.hidden {
+    display: none;
+}
+
+.menu-list__item:hover {
+    background: #e2c691;
+}
+
+.menu-list__item.selected {
+    background: white;
+    color: #deac50;
+}
+
+.menu-list__item.selected .menu-list__delete-button {
+    color: #deac50;
+}
+
+.menu-list__item.selected .menu-list__delete-button:active {
+    background: #deac50;
+    color: white;
+}
+
+.menu-list__new-item {
+    padding: 10px 15px;
+    background: #d09e41;
+}
+
+.menu-list__new-item.hidden {
+    display: none;
+}
+
+.menu-list__input {
+    background: none;
+    border: none;
+    outline: none;
+    color: white;
+}
+
+.menu-list__input::placeholder {
+    color: #ffcd70;
+}
+
+.item-list {
+    flex: 1;
+    padding: 15px;
+    background: #e6e6e6;
+    overflow: auto;
+}
+
+.item-list__header {
+    color: #de5050;
+}
+
+.item-list__item {
+    display: grid;
+    grid-template:  "title title title"
+                    "image description first-button"
+                    "image description second-button"
+                    / 150px auto 50px;
+    padding: 10px;
+    background: #c7c7c7;
+    border-radius: 5px;
+    margin: 0 0 10px 0;
+}
+
+.item-list__item:last-child {
+    margin: 0;
+}
+
+.item-list__item__image {
+    grid-area: image;
+    width: 100%;
+    border-radius: 5px;
+}
+
+.item-list__item__image-real-input {
+    height: 0;
+    width: 0;
+}
+
+.item-list__item__title {
+    grid-area: title;
+    margin: 0 0 5px 0;
+    color: #3a3a3a;
+    border-radius: 5px;
+}
+
+.item-list__item__title.input {
+    background: #e6e6e6;
+    padding: 4px;
+}
+
+.item-list__item__description {
+    grid-area: description;
+    padding: 0 8px;
+    color: #777777;
+    background: #e6e6e6;
+    border-radius: 5px;
+    padding: 8px;
+    margin: 0 10px;
+}
+
+.item-list__item__description.input {
+    resize: none;
+}
+
+.item-list__item__save-button,
+.item-list__item__edit-button {
+    grid-area: first-button;
+}
+
+.item-list__item__cancel-button,
+.item-list__item__delete-button {
+    grid-area: second-button;
+}
+
+.item-list__item__delete-button,
+.item-list__item__edit-button,
+.item-list__item__save-button,
+.item-list__item__cancel-button {
+    border: thin outset #de5050;
+    outline: none;
+    color: white;
+    background: #de5050;
+    border-radius: 5px;
+    font-size: 1.2em;
+    margin: auto 0;
+    height: 80%;
+    min-height: 45px;
+}
+
+.item-list__item__delete-button:active,
+.item-list__item__edit-button:active,
+.item-list__item__save-button:active,
+.item-list__item__cancel-button:active {
+    border: thin inset #de5050;
+}
+
+.item-list__item__title.input,
+.item-list__item__image.input,
+.item-list__item__description.input,
+.item-list__item__save-button,
+.item-list__item__cancel-button {
+    display: none;
+}
+
+.item-list__item.editmode .item-list__item__title.input,
+.item-list__item.editmode .item-list__item__image.input,
+.item-list__item.editmode .item-list__item__description.input,
+.item-list__item.editmode .item-list__item__save-button,
+.item-list__item.editmode .item-list__item__cancel-button {
+    display: block;
+}
+
+.item-list__item.editmode .item-list__item__title,
+.item-list__item.editmode .item-list__item__image,
+.item-list__item.editmode .item-list__item__description,
+.item-list__item.editmode .item-list__item__edit-button,
+.item-list__item.editmode .item-list__item__delete-button {
+    display: none;
 }

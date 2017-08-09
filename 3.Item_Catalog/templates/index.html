@@ -6,10 +6,13 @@
 
         <title>Item Catalog</title>
 
+        <script src="https://use.fontawesome.com/ab14e7d176.js"></script>
+
         <link rel="stylesheet" href="{{ url_for('static', filename='css/normalize.min.css') }}">
         <link rel="stylesheet" href="{{ url_for('static', filename='css/init.css') }}">
         <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
         <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+
 
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
         <script src="https://apis.google.com/js/api:client.js"></script>
@@ -33,21 +36,41 @@
                     <h2>Categories</h2>
                 </header>
 
+                <hr>
+
                 <ul class="menu-list__item-container">
-                    <li class="menu-list__item">A</li>
-                    <li class="menu-list__item">B</li>
-                    <li class="menu-list__item">C</li>
+                    <li class="menu-list__item">
+                        <button class="menu-list__delete-button fa fa-trash-o" type="button" name="button"></button>
+                        <span>A</span>
+                    </li>
+                    <li class="menu-list__new-item">
+                        <input class="menu-list__input" type="text" placeholder="New Category" name="" value="">
+                    </li>
                 </ul>
             </aside>
+
             <section class="item-list">
                 <header class="item-list__header">
-                    <h2>Recent Items</h2>
+                    <h2 class="item-list__header-text">Recent Items</h2>
                 </header>
 
-                <ul class="item-list__item-container">
-                    <li class="item-list__item">A</li>
-                    <li class="item-list__item">B</li>
-                    <li class="item-list__item">C</li>
+                <hr>
+
+                <ul class="item-list__container">
+                    <li class="item-list__item">
+                        <h3 class="item-list__item__title">Title</h3>
+                        <img class="item-list__item__image" src="{{ url_for('static', filename='img/no_image.svg') }}">
+                        <p class="item-list__item__description">Description</p>
+                        <button class="item-list__item__edit-button fa fa-pencil" type="button" name="button"></button>
+                        <button class="item-list__item__delete-button fa fa-trash-o" type="button" name="button"></button>
+
+                        <input class="item-list__item__title input" placeholder="Title" type="text" name="" value="Title">
+                        <input class="item-list__item__image input" type="image" src="{{ url_for('static', filename='img/no_image.svg') }}">
+                        <input class="item-list__item__image-real-input" type="file" name="" value="">
+                        <textarea class="item-list__item__description input" placeholder="Description"></textarea>
+                        <button class="item-list__item__save-button fa fa-check" type="button" name="button"></button>
+                        <button class="item-list__item__cancel-button fa fa-times" type="button" name="button"></button>
+                    </li>
                 </ul>
             </section>
         </main>
@@ -74,6 +97,7 @@
                         $username.text(result.response.user_name);
 
                         $userPicture.attr('src', result.response.user_picture);
+                        $userPicture.attr('alt', 'User image');
                     });
                 }
 
@@ -106,6 +130,7 @@
                                 $username.toggleClass('visible');
 
                                 $userPicture.attr('src', '{{ url_for('static', filename='img/btn_google_light_normal_ios.svg') }}');
+                                $userPicture.attr('alt', 'Google logo');
                             },
                             function(error) {
                                 window.alert('Failed to log out: '+JSON.stringify(error, undefined, 2));
