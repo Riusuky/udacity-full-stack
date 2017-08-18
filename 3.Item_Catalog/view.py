@@ -7,7 +7,7 @@ from functools import update_wrapper
 from flask import request, g, make_response
 from flask import Flask, jsonify, render_template
 
-from models import User, Category, Image, Item, Response, engine
+from models import User, Category, Image, Item, engine
 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, func
@@ -30,6 +30,16 @@ session = db_session()
 
 app = Flask(__name__)
 
+def Response(response = {}, error = None, response_code = 200):
+    if response_code == 200 and error:
+        response_code = 500
+
+    return (jsonify(
+        error if error
+        else response),
+        response_code)
+
+
 def generate_state():
     return ''.join(random.choice(string.ascii_uppercase + string.digits)
         for x in range(32))
@@ -38,7 +48,16 @@ def generate_state():
 def requires_authentication(f):
     def decorator(*args, **kwargs):
         if 'userid' not in login_session:
-            return (jsonify({'data':'Request requires authentication','error':'401'}),401)
+            return Response(error = 'Request requires authentication', response_code = 401)
+
+        return f(*args, **kwargs)
+
+    return update_wrapper(decorator, f)
+
+def requires_state_consistency(f):
+    def decorator(*args, **kwargs):
+        if ('state' not in request.headers) or (request.headers['state'] != login_session['state']):
+            return Response(error = 'Invalid state parameter', response_code = 401)
 
         return f(*args, **kwargs)
 
@@ -84,9 +103,11 @@ def get_categories(id = None):
             response = Response(session.query(Category).filter(
                 Category.id == id).one().tojson())
         except NoResultFound:
-            response = Response(error = 'No result found')
+            response = Response([])
         except:
-            response = Response(error = 'Unknown error')
+            response = Response(
+                error = 'Unknown error',
+                response_code = 500)
 
         return response
     else:
@@ -96,30 +117,39 @@ def get_categories(id = None):
             category_list.append(category.tojson())
 
         return Response(category_list) if len(category_list) > 0 \
-            else Response(error = 'No result found')
+            else Response([])
 
 @requires_authentication
+@requires_state_consistency
 def add_category(name):
     owner_id = login_session['userid']
 
     try:
-        session.add(Category(name = name, owner_id = owner_id))
+        newCategory = Category(name = name, owner_id = owner_id);
+
+        session.add(newCategory)
         session.commit()
 
-        return Response('Success')
+        return Response(newCategory.tojson())
     except IntegrityError:
         session.rollback()
         return Response(
             error = 'Invalid new category parameters. '
-            '(name: {}, owner_id: {})'.format(name, owner_id))
+            '(name: {}, owner_id: {})'.format(name, owner_id),
+            response_code = 400)
     except InvalidRequestError as e:
         print(e)
-        return Response(error = 'Failed to add new category')
+        return Response(
+            error = 'Failed to add new category',
+            response_code = 400)
     except:
         print("Unexpected error:", sys.exc_info()[0])
-        return Response(error = 'Failed to add new category')
+        return Response(
+            error = 'Failed to add new category',
+            response_code = 500)
 
 @requires_authentication
+@requires_state_consistency
 def delete_category(id):
     try:
         category = session.query(Category).filter(Category.id == id).one()
@@ -132,28 +162,35 @@ def delete_category(id):
         return Response('Success')
 
     except DataError:
-        return Response(error = 'Category id is not an integer')
+        return Response(
+            error = 'Category id is not an integer',
+            response_code = 400)
     except NoResultFound:
         return Response(
             error = 'There is no category that corresponds '
-                    'to the specified id. (id: {})'.format(id))
+                    'to the specified id. (id: {})'.format(id),
+            response_code = 400)
     except InternalError as e:
         print(e)
         return Response(
-            error = 'Failed to delete category with id: {}'.format(id))
+            error = 'Failed to delete category with id: {}'.format(id),
+            response_code = 500)
     except IntegrityError as e:
         print(e)
         session.rollback()
         return Response(
-            error = 'Failed to delete category with id: {}'.format(id))
+            error = 'Failed to delete category with id: {}'.format(id),
+            response_code = 400)
     except InvalidRequestError as e:
         print(e)
         return Response(
-            error = 'Failed to delete category with id: {}'.format(id))
+            error = 'Failed to delete category with id: {}'.format(id),
+            response_code = 400)
     except:
         print("Unexpected error:", sys.exc_info()[0])
         return Response(
-            error = 'Failed to delete category with id: {}'.format(id))
+            error = 'Failed to delete category with id: {}'.format(id),
+            response_code = 500)
 
 
 def get_items(id = None):
@@ -162,9 +199,11 @@ def get_items(id = None):
             response = Response(session.query(Item).filter(
                 Item.id == id).one().tojson())
         except NoResultFound:
-            response = Response(error = 'No result found')
+            response = Response([])
         except:
-            response = Response(error = 'Unknown error')
+            response = Response(
+                error = 'Unknown error',
+                response_code = 500)
 
         return response
     else:
@@ -174,9 +213,10 @@ def get_items(id = None):
             item_list.append(item.tojson())
 
         return Response(item_list) if len(item_list) > 0\
-            else Response(error = 'No result found')
+            else Response([])
 
 @requires_authentication
+@requires_state_consistency
 def add_item(name, category_id, description = None, image_id = None):
     owner_id = login_session['userid']
 
@@ -194,32 +234,42 @@ def add_item(name, category_id, description = None, image_id = None):
     except IntegrityError as e:
         print(e)
         session.rollback()
-        return Response(error = 'Invalid new item parameters. '
-                        '(name: {}, '
-                        'description: {}, '
-                        'category_id: {}, '
-                        'owner_id: {}'
-                        'image_id: {})'
-                        .format(name,
-                            description,
-                            category_id,
-                            owner_id,
-                            image_id))
+        return Response(
+            error = 'Invalid new item parameters. '
+                    '(name: {}, '
+                    'description: {}, '
+                    'category_id: {}, '
+                    'owner_id: {}'
+                    'image_id: {})'
+                    .format(name,
+                        description,
+                        category_id,
+                        owner_id,
+                        image_id),
+            response_code = 400)
     except InvalidRequestError as e:
         print(e)
-        return Response(error = 'Failed to add new item')
+        return Response(
+            error = 'Failed to add new item',
+            response_code = 400)
     except:
         print("Unexpected error:", sys.exc_info()[0])
-        return Response(error = 'Failed to add new item')
+        return Response(
+            error = 'Failed to add new item',
+            response_code = 500)
 
 @requires_authentication
+@requires_state_consistency
 def update_item(id, name = None, category_id = None, description = None, image_id = None):
     try:
         target = session.query(Item).filter(Item.id == id).one()
     except NoResultFound:
-        return Response(error = 'No result found')
+        return Response(error = 'No result found',
+            response_code = 400)
     except:
-        return Response(error = 'Unknown error')
+        return Response(
+            error = 'Unknown error',
+            response_code = 500)
     else:
         if not check_authorization(target.owner_id):
             return (jsonify({'data':'Permission denied','error':'401'}),401)
@@ -253,22 +303,29 @@ def update_item(id, name = None, category_id = None, description = None, image_i
             except IntegrityError as e:
                 print(e)
                 session.rollback()
-                return Response(error = 'Invalid new item parameters. '
-                                '(name: {}, '
-                                'description: {}, '
-                                'category_id: {}, '
-                                'image_id: {})'
-                                .format(name, description, category_id, image_id))
+                return Response(
+                    error = 'Invalid new item parameters. '
+                            '(name: {}, '
+                            'description: {}, '
+                            'category_id: {}, '
+                            'image_id: {})'
+                            .format(name, description, category_id, image_id),
+                    response_code = 400)
             except InvalidRequestError as e:
                 print(e)
-                return Response(error = 'Failed to update item')
+                return Response(
+                    error = 'Failed to update item',
+                    response_code = 400)
             except:
                 print("Unexpected error:", sys.exc_info()[0])
-                return Response(error = 'Failed to update item')
+                return Response(
+                    error = 'Failed to update item',
+                    response_code = 500)
         else:
             return Response('Item has not changed')
 
 @requires_authentication
+@requires_state_consistency
 def delete_item(id):
     try:
         target = session.query(Item).filter(Item.id == id).one()
@@ -281,19 +338,24 @@ def delete_item(id):
 
         return Response('Success')
     except DataError:
-        return Response(error = 'Item id is not an integer')
+        return Response(
+            error = 'Item id is not an integer',
+            response_code = 400)
     except NoResultFound:
         return Response(
             error = 'There is no item that corresponds '
-                    'to the specified id. (id: {})'.format(id))
+                    'to the specified id. (id: {})'.format(id),
+            response_code = 400)
     except InternalError as e:
         print(e)
         return Response(
-            error = 'Failed to delete item with id: {}'.format(id))
+            error = 'Failed to delete item with id: {}'.format(id),
+            response_code = 500)
     except:
         print("Unexpected error:", sys.exc_info()[0])
         return Response(
-            error = 'Failed to delete item with id: {}'.format(id))
+            error = 'Failed to delete item with id: {}'.format(id),
+            response_code = 500)
 
 
 class RateLimit(object):
@@ -349,26 +411,14 @@ def inject_x_rate_headers(response):
 @ratelimit(limit=30, per=60 * 1)
 def index():
     state =  generate_state()
-    print(login_session['state'])
-    print(state)
-    login_session['state'] = state
-
-    return render_template('index.html', STATE=state)
-
-@app.route('/category')
-@ratelimit(limit=30, per=60 * 1)
-def page_category():
-    state =  generate_state()
     login_session['state'] = state
 
     return render_template('index.html', STATE=state)
 
 @app.route('/gconnect', methods=['POST'])
+@requires_state_consistency
 @ratelimit(limit=30, per=60 * 1)
 def gconnect():
-    if request.args.get('state') != login_session['state']:
-        return (jsonify({'data':'Invalid state parameter','error':'401'}),401)
-
     try:
         idinfo = client.verify_id_token(request.data, '1014623565180-lm2sl4gftjv5r8jhgikg0ti9lcldol8c.apps.googleusercontent.com')
 
@@ -376,8 +426,6 @@ def gconnect():
             raise crypt.AppIdentityError("Wrong issuer.")
     except crypt.AppIdentityError:
         return (jsonify({'data':'Invalid authentication issuer','error':'401'}),401)
-
-    print(idinfo)
 
     user = get_user(idinfo['email'])
 
@@ -389,18 +437,16 @@ def gconnect():
 
     login_session['userid'] = user.id
 
-    return jsonify(Response({'user_name': idinfo['name'], 'user_picture': idinfo['picture']}).tojson())
+    return Response({'user_id': user.id,'user_name': idinfo['name'], 'user_picture': idinfo['picture']})
 
 @app.route('/gdisconnect', methods=['POST'])
 @ratelimit(limit=30, per=60 * 1)
 @requires_authentication
+@requires_state_consistency
 def gdisconnect():
-    if request.args.get('state') != login_session['state']:
-        return (jsonify({'data':'Invalid state parameter','error':'401'}),401)
-        
     del login_session['userid']
 
-    return jsonify(Response('User disconnected successfully').tojson())
+    return Response('User disconnected successfully')
 
 @app.route('/api/category',
     defaults={'category': None},
@@ -410,26 +456,29 @@ def gdisconnect():
 @ratelimit(limit=10, per=60 * 1)
 def api_category(category):
     if request.method == 'GET':
-        return jsonify(get_categories(category).tojson())
+        return get_categories(category)
 
     elif request.method == 'POST':
         if 'name' in request.json:
-            return jsonify(add_category(name = request.json['name']).tojson())
+            return add_category(name = request.json['name'])
         else:
-            return jsonify(
-                Response(error = 'Missing "name" parameter').tojson())
+            return Response(
+                error = 'Missing "name" parameter',
+                response_code = 400)
 
     elif request.method == 'DELETE':
         if category:
-            return jsonify(delete_category(category).tojson())
+            return delete_category(category)
         elif 'id' in request.json:
-            return jsonify(delete_category(request.json['id']).tojson())
+            return delete_category(request.json['id'])
         else:
-            return jsonify(
-                Response(error = 'Missing "id" parameter').tojson())
+            return Response(
+                error = 'Missing "id" parameter',
+                response_code = 400)
     else:
-        return jsonify(
-            Response(error = 'Method is not yet implemented').tojson())
+        return Response(
+            error = 'Method is not yet implemented',
+            response_code = 400)
 
 @app.route('/api/item',
     defaults={'item': None},
@@ -439,31 +488,33 @@ def api_category(category):
 @ratelimit(limit=10, per=60 * 1)
 def api_item(item):
     if request.method == 'GET':
-        return jsonify(get_items(item).tojson())
+        return get_items(item)
 
     elif request.method == 'POST':
         if ('name' in request.json) and ('category_id' in request.json):
-            return jsonify(add_item(**request.json).tojson())
+            return add_item(**request.json)
         else:
-            return jsonify(
-                Response(
-                    error = 'Missing "name" '
-                            'or "category_id" parameters').tojson())
+            return Response(
+                error = 'Missing "name" '
+                        'or "category_id" parameters',
+                response_code = 400)
 
     elif request.method == 'DELETE':
         if item:
-            return jsonify(delete_item(item).tojson())
+            return delete_item(item)
         elif 'id' in request.json:
-            return jsonify(delete_item(request.json['id']).tojson())
+            return delete_item(request.json['id'])
         else:
-            return jsonify(
-                Response(error = 'Missing "id" parameter').tojson())
+            return Response(
+                error = 'Missing "id" parameter',
+                response_code = 400)
 
     elif request.method == 'PATCH':
-        return jsonify(update_item(item, **request.json).tojson())
+        return update_item(item, **request.json)
     else:
-        return jsonify(
-            Response(error = 'Method is not yet implemented').tojson())
+        return Response(
+            error = 'Method is not yet implemented',
+            response_code = 405)
 
 if __name__ == '__main__':
     app.secret_key = 'i3Ldm4dv8c9sBsc45A3vx6sO3plsn'

@@ -64,7 +64,10 @@ class Category(Base):
         back_populates = 'categories')
 
     def tojson(self):
-        return {'id': self.id, 'name': self.name}
+        return {
+            'id': self.id,
+            'name': self.name,
+            'owner_id': self.owner_id}
 
 
 # TODO: handle orphan images
@@ -109,17 +112,9 @@ class Item(Base):
             'description': self.description,
             'category_id': self.category_id,
             'image_id': self.image_id,
-            'created_on': self.created_on}
+            'created_on': self.created_on,
+            'owner_id': self.owner_id}
 
 
 engine = create_engine('postgresql:///udacity_catalog')
 Base.metadata.create_all(engine)
-
-
-class Response():
-    def __init__(self, response = {}, error = None):
-        self.response = response
-        self.error = error
-
-    def tojson(self):
-        return {'response': self.response, 'error': self.error}

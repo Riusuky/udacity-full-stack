@@ -13,8 +13,6 @@
         <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
         <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
 
-
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
         <script src="https://apis.google.com/js/api:client.js"></script>
     </head>
     <body>
@@ -39,11 +37,11 @@
                 <hr>
 
                 <ul class="menu-list__item-container">
-                    <li class="menu-list__item">
+                    <!-- <li class="menu-list__item">
                         <button class="menu-list__delete-button fa fa-trash-o" type="button" name="button"></button>
                         <span>A</span>
-                    </li>
-                    <li class="menu-list__new-item">
+                    </li> -->
+                    <li class="menu-list__new-item hidden">
                         <input class="menu-list__input" type="text" placeholder="New Category" name="" value="">
                     </li>
                 </ul>
@@ -75,79 +73,109 @@
             </section>
         </main>
 
+        <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/underscore-min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/backbone-min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
         <script>
-            gapi.load('auth2', function(){
-                var user = null;
+            'use strict';
 
-                var $username = $('.header__username');
-                var $userPicture = $('.header__login-img');
-                var $loginButtonText = $('.header__login-text');
+            (function() {
+                var backboneSync = Backbone.sync;
 
-                function signInToBackend(id_token) {
-                    $.ajax({
-                        type: 'POST',
-                        url: '/gconnect?state={{STATE}}',
-                        processData: false,
-                        data: id_token,
-                        contentType: 'application/octet-stream; charset=utf-8'
-                    }).done(function(result) {
-                        $loginButtonText.text('Sign out');
+                Backbone.sync = function (method, model, options) {
+                    options.headers = {
+                    'state': '{{STATE}}'
+                    };
 
-                        $username.toggleClass('visible');
-                        $username.text(result.response.user_name);
+                    backboneSync(method, model, options);
+                };
 
-                        $userPicture.attr('src', result.response.user_picture);
-                        $userPicture.attr('alt', 'User image');
-                    });
-                }
+                var categoryMenuView = new CategoryMenuView();
 
-                function signIn() {
-                    auth2.signIn().then(
-                        function(googleUser) {
-                            user = googleUser;
+                gapi.load('auth2', function(){
+                    var user = null;
 
-                            var id_token = googleUser.getAuthResponse().id_token;
+                    var $username = $('.header__username');
+                    var $userPicture = $('.header__login-img');
+                    var $loginButtonText = $('.header__login-text');
 
-                            console.log(id_token);
+                    function signInToBackend(id_token) {
+                        $.ajax({
+                            type: 'POST',
+                            url: '/gconnect',
+                            processData: false,
+                            data: id_token,
+                            contentType: 'application/octet-stream; charset=utf-8',
+                            headers: { 'state': '{{STATE}}' }
+                        }).done(function(result) {
+                            $loginButtonText.text('Sign out');
 
-                            signInToBackend(id_token);
-                        },
-                        function(error) {
+                            categoryMenuView.setInputVisibility();
+
+                            $username.toggleClass('visible');
+                            $username.text(result.user_name);
+
+                            categoryCollection.setUserId(result.user_id);
+
+                            $userPicture.attr('src', result.user_picture);
+                            $userPicture.attr('alt', 'User image');
+                        }).fail(function(error) {
                             window.alert('Failed to log in: '+JSON.stringify(error, undefined, 2));
-                        }
-                    );
-                }
+                        });
+                    }
 
-                function signOut() {
-                    $.ajax({
-                        type: 'POST',
-                        url: '/gdisconnect?state={{STATE}}',
-                    }).done(function(result) {
-                        auth2.signOut().then(
-                            function() {
-                                $loginButtonText.text('Sign in');
+                    function signIn() {
+                        auth2.signIn().then(
+                            function(googleUser) {
+                                user = googleUser;
 
-                                $username.toggleClass('visible');
+                                var id_token = googleUser.getAuthResponse().id_token;
 
-                                $userPicture.attr('src', '{{ url_for('static', filename='img/btn_google_light_normal_ios.svg') }}');
-                                $userPicture.attr('alt', 'Google logo');
+                                signInToBackend(id_token);
                             },
                             function(error) {
-                                window.alert('Failed to log out: '+JSON.stringify(error, undefined, 2));
+                                window.alert('Failed to log in: '+JSON.stringify(error, undefined, 2));
                             }
                         );
-                    }).fail(function(error) {
-                        window.alert('Failed to log out: '+JSON.stringify(error, undefined, 2));
+                    }
+
+                    function signOut() {
+                        $.ajax({
+                            type: 'POST',
+                            url: '/gdisconnect',
+                            headers: { 'state': '{{STATE}}' }
+                        }).done(function(result) {
+                            auth2.signOut().then(
+                                function() {
+                                    $loginButtonText.text('Sign in');
+
+                                    categoryMenuView.setInputVisibility(false);
+
+                                    $username.toggleClass('visible');
+
+                                    categoryCollection.setUserId(null);
+
+                                    $userPicture.attr('src', '{{ url_for('static', filename='img/btn_google_light_normal_ios.svg') }}');
+                                    $userPicture.attr('alt', 'Google logo');
+                                },
+                                function(error) {
+                                    window.alert('Failed to log out: '+JSON.stringify(error, undefined, 2));
+                                }
+                            );
+                        }).fail(function(error) {
+                            window.alert('Failed to log out: '+JSON.stringify(error, undefined, 2));
+                        });
+                    }
+
+                    var auth2 = gapi.auth2.init({
+                        client_id: '1014623565180-lm2sl4gftjv5r8jhgikg0ti9lcldol8c.apps.googleusercontent.com',
+                        cookiepolicy: 'single_host_origin',
+                        scope: 'profile email'
                     });
-                }
 
-                auth2 = gapi.auth2.init({
-                    client_id: '1014623565180-lm2sl4gftjv5r8jhgikg0ti9lcldol8c.apps.googleusercontent.com',
-                    cookiepolicy: 'single_host_origin',
-                    scope: 'profile email'
-                });
-
-                auth2.then(
+                    auth2.then(
                     function() {
                         if(auth2.isSignedIn.get()) {
                             user = auth2.currentUser.get();
@@ -167,8 +195,15 @@
                     function(error) {
                         window.alert('Failed to initialize google oauth: '+JSON.stringify(error, undefined, 2));
                     }
-                );
-            });
+                    );
+                });
+
+                categoryCollection.fetch({
+                    error: function() {
+                        window.alert('Failed to fetch categories from server');
+                    }
+                });
+            })();
         </script>
     </body>
 </html>
