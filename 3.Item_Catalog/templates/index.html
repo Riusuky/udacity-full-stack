@@ -69,9 +69,11 @@
             (function() {
                 var backboneSync = Backbone.sync;
 
+                categoryCollection.userState = '{{STATE}}';
+
                 Backbone.sync = function (method, model, options) {
                     options.headers = {
-                    'state': '{{STATE}}'
+                        'state': '{{STATE}}'
                     };
 
                     backboneSync(method, model, options);

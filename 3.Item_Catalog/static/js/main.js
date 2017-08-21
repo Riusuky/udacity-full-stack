@@ -169,7 +169,8 @@ var ItemView = Backbone.View.extend({
         'click .item-list__item__delete-button': 'onDelete',
         'click .item-list__item__save-button': 'onSave',
         'click .item-list__item__cancel-button': 'onCancel',
-        'click .item-list__item__image': 'pickImage'
+        'click .item-list__item__image.input': 'pickImage',
+        'change .item-list__item__image-real-input': 'setImage'
     },
 
     initialize: function() {
@@ -177,6 +178,7 @@ var ItemView = Backbone.View.extend({
 
         if(this.model) {
             this.listenTo(this.model, 'destroy', this.onDestroy);
+            this.listenTo(this.model, 'remove', this.onDestroy);
             this.listenTo(this.model, 'change', this.render);
         }
 
@@ -188,10 +190,23 @@ var ItemView = Backbone.View.extend({
     onDelete: function(event) {
         event.stopPropagation();
 
+        var imageId = this.model.get('image_id');
+
         this.model.destroy({
             wait: true,
             error: function(model, response) {
                 window.alert('Failed to remove item. Response: '+response.responseText);
+            },
+            success: function() {
+                if(imageId) {
+                    $.ajax({
+                        type: 'DELETE',
+                        url: '/api/image/'+imageId,
+                        headers: { 'state': categoryCollection.userState }
+                    }).fail(function(error) {
+                        window.alert('Failed to delete image attached: '+JSON.stringify(error, undefined, 2));
+                    });
+                }
             }
         });
     },
@@ -202,6 +217,8 @@ var ItemView = Backbone.View.extend({
         this.$titleInput.val(this.model.get('name'));
         this.$descriptionInput.val(this.model.get('description'));
         this.$categoryInput.val(categoryCollection.get(this.model.get('category_id')).get('id'));
+        this.$imageInput[0].src = this.model.get('image_url');
+        this.imageInputFile = null;
 
         this.setEditMode(true);
     },
@@ -234,38 +251,113 @@ var ItemView = Backbone.View.extend({
 
         if(this.editMode) {
             if(this.model) {
-                this.model.save({
-                    name: self.$titleInput.val(),
-                    description: self.$descriptionInput.val(),
-                    category_id: Number(self.$categoryInput.val())
-                }, {
-                    patch: true,
-                    wait: true,
-                    error: function(model, response) {
-                        window.alert('Failed to edit item. Response: '+response.responseText);
-                    },
-                    success: function() {
-                        self.setEditMode(false);
-                    }
-                });
-            }
-            else {
-                itemCollection.create(
-                    {
+                if(this.imageInputFile) {
+                    var formData = new FormData();
+
+                    formData.append('image', this.imageInputFile, this.imageInputFile.name);
+
+                    var imageId = this.model.get('image_id');
+
+                    var requestType = imageId ? 'PATCH' : 'POST'
+
+                    $.ajax({
+                        type: requestType,
+                        url: '/api/image'+(imageId ? `/${imageId}` : ''),
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        headers: { 'state': categoryCollection.userState }
+                    }).done(function(result) {
+                        self.model.save({
+                            name: self.$titleInput.val(),
+                            description: self.$descriptionInput.val(),
+                            category_id: Number(self.$categoryInput.val()),
+                            image_id: result.id
+                        }, {
+                            patch: true,
+                            wait: true,
+                            error: function(model, response) {
+                                window.alert('Failed to edit item. Response: '+response.responseText);
+                            },
+                            success: function() {
+                                self.setEditMode(false);
+                                self.model.fetch();
+                            }
+                        });
+                    }).fail(function(error) {
+                        window.alert('Failed to upload image: '+JSON.stringify(error, undefined, 2));
+                    });
+                }
+                else {
+                    this.model.save({
                         name: self.$titleInput.val(),
                         description: self.$descriptionInput.val(),
                         category_id: Number(self.$categoryInput.val())
-                    },
-                    {
+                    }, {
+                        patch: true,
                         wait: true,
                         error: function(model, response) {
-                            window.alert('Failed to create item. Response: '+response.responseText);
+                            window.alert('Failed to edit item. Response: '+response.responseText);
                         },
                         success: function() {
-                            self.onDestroy();
+                            self.setEditMode(false);
                         }
-                    }
-                );
+                    });
+                }
+            }
+            else {
+                if(this.imageInputFile) {
+                    var formData = new FormData();
+
+                    formData.append('image', this.imageInputFile, this.imageInputFile.name);
+
+                    $.ajax({
+                        type: 'POST',
+                        url: '/api/image',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        headers: { 'state': categoryCollection.userState }
+                    }).done(function(result) {
+                        itemCollection.create(
+                            {
+                                name: self.$titleInput.val(),
+                                description: self.$descriptionInput.val(),
+                                category_id: Number(self.$categoryInput.val()),
+                                image_id: result.id
+                            },
+                            {
+                                wait: true,
+                                error: function(model, response) {
+                                    window.alert('Failed to create item. Response: '+response.responseText);
+                                },
+                                success: function() {
+                                    self.onDestroy();
+                                }
+                            }
+                        );
+                    }).fail(function(error) {
+                        window.alert('Failed to upload image: '+JSON.stringify(error, undefined, 2));
+                    });
+                }
+                else {
+                    itemCollection.create(
+                        {
+                            name: self.$titleInput.val(),
+                            description: self.$descriptionInput.val(),
+                            category_id: Number(self.$categoryInput.val())
+                        },
+                        {
+                            wait: true,
+                            error: function(model, response) {
+                                window.alert('Failed to create item. Response: '+response.responseText);
+                            },
+                            success: function() {
+                                self.onDestroy();
+                            }
+                        }
+                    );
+                }
             }
         }
     },
@@ -277,6 +369,24 @@ var ItemView = Backbone.View.extend({
 
     pickImage: function() {
         this.$fileInput.click();
+    },
+
+    setImage: function() {
+        if(this.$fileInput[0].files.length > 0) {
+            this.imageInputFile = this.$fileInput[0].files[0];
+
+            var reader = new FileReader();
+
+            var self = this;
+
+            reader.onload = function (e) {
+                self.$imageInput[0].src = e.target.result;
+            }
+
+            reader.readAsDataURL(this.imageInputFile);
+
+            this.$fileInput.val('');
+        }
     },
 
     render: function() {
@@ -294,6 +404,7 @@ var ItemView = Backbone.View.extend({
             this.$descriptionInput = this.$('.item-list__item__description.input');
             this.$categoryInput = this.$('.item-list__item__category.input');
 
+            this.$imageInput = this.$('.item-list__item__image.input');
             this.$fileInput = this.$('.item-list__item__image-real-input');
 
             var self = this;
@@ -329,6 +440,7 @@ var ItemView = Backbone.View.extend({
             this.$descriptionInput = this.$('.item-list__item__description.input');
             this.$categoryInput = this.$('.item-list__item__category.input');
 
+            this.$imageInput = this.$('.item-list__item__image.input');
             this.$fileInput = this.$('.item-list__item__image-real-input');
 
             var self = this;
@@ -358,6 +470,8 @@ var CategoryMenuView = Backbone.View.extend({
         this.listenTo(categoryCollection, 'add', this.render);
         this.listenTo(categoryCollection, 'reset', this.render);
         this.listenTo(categoryCollection, 'remove', this.onRemove);
+
+        this.render();
     },
 
     setInputVisibility: function(visible = true) {
@@ -440,7 +554,9 @@ var ItemListView = Backbone.View.extend({
             this.cancelNewItem();
         }
 
-        this.cancelLastEditingItem();
+        if(itemView != this.lastEditingItem) {
+            this.cancelLastEditingItem();
+        }
 
         this.lastEditingItem = itemView;
     },

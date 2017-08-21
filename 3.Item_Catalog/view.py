@@ -2,12 +2,15 @@ from redis import Redis
 
 from oauth2client import client, crypt
 
-import time, sys
+import time
+import sys
+import os
 from functools import update_wrapper
 from flask import request, g, make_response
 from flask import Flask, jsonify, render_template
 
 from models import User, Category, Image, Item, engine
+from models import uploaded_images
 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, func
@@ -18,6 +21,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import InvalidRequestError
 
 from flask import session as login_session
+
+from flask_uploads import configure_uploads, UploadNotAllowed
+
 import random
 import string
 
@@ -29,8 +35,13 @@ db_session.configure(bind=engine)
 session = db_session()
 
 app = Flask(__name__)
+app.config['UPLOADED_IMAGES_DEST'] = 'static/item_images'
+app.config['UPLOADED_IMAGES_URL'] = 'item_images/'
 
-def Response(response = {}, error = None, response_code = 200):
+configure_uploads(app, uploaded_images)
+
+
+def Response(response={}, error=None, response_code=200):
     if response_code == 200 and error:
         response_code = 500
 
@@ -42,22 +53,25 @@ def Response(response = {}, error = None, response_code = 200):
 
 def generate_state():
     return ''.join(random.choice(string.ascii_uppercase + string.digits)
-        for x in range(32))
+                   for x in range(32))
 
 
 def requires_authentication(f):
     def decorator(*args, **kwargs):
         if 'userid' not in login_session:
-            return Response(error = 'Request requires authentication', response_code = 401)
+            return Response(
+                error='Request requires authentication', response_code=401)
 
         return f(*args, **kwargs)
 
     return update_wrapper(decorator, f)
 
+
 def requires_state_consistency(f):
     def decorator(*args, **kwargs):
-        if ('state' not in request.headers) or (request.headers['state'] != login_session['state']):
-            return Response(error = 'Invalid state parameter', response_code = 401)
+        if ('state' not in request.headers)
+        or (request.headers['state'] != login_session['state']):
+            return Response(error='Invalid state parameter', response_code=401)
 
         return f(*args, **kwargs)
 
@@ -70,6 +84,7 @@ def check_authorization(userid):
 
     return False
 
+
 def get_user(email):
     try:
         return session.query(User).filter(
@@ -79,9 +94,10 @@ def get_user(email):
     except:
         return None
 
+
 def add_user(email, name):
     try:
-        new_user = User(email = email, name = name)
+        new_user = User(email=email, name=name)
 
         session.add(new_user)
         session.commit()
@@ -97,7 +113,8 @@ def add_user(email, name):
         print("Unexpected error:", sys.exc_info()[0])
         return None
 
-def get_categories(id = None):
+
+def get_categories(id=None):
     if id is not None:
         try:
             response = Response(session.query(Category).filter(
@@ -106,8 +123,8 @@ def get_categories(id = None):
             response = Response([])
         except:
             response = Response(
-                error = 'Unknown error',
-                response_code = 500)
+                error='Unknown error',
+                response_code=500)
 
         return response
     else:
@@ -119,13 +136,14 @@ def get_categories(id = None):
         return Response(category_list) if len(category_list) > 0 \
             else Response([])
 
+
 @requires_authentication
 @requires_state_consistency
 def add_category(name):
     owner_id = login_session['userid']
 
     try:
-        newCategory = Category(name = name, owner_id = owner_id);
+        newCategory = Category(name=name, owner_id=owner_id)
 
         session.add(newCategory)
         session.commit()
@@ -134,19 +152,20 @@ def add_category(name):
     except IntegrityError:
         session.rollback()
         return Response(
-            error = 'Invalid new category parameters. '
+            error='Invalid new category parameters. '
             '(name: {}, owner_id: {})'.format(name, owner_id),
-            response_code = 400)
+            response_code=400)
     except InvalidRequestError as e:
         print(e)
         return Response(
-            error = 'Failed to add new category',
-            response_code = 400)
+            error='Failed to add new category',
+            response_code=400)
     except:
         print("Unexpected error:", sys.exc_info()[0])
         return Response(
-            error = 'Failed to add new category',
-            response_code = 500)
+            error='Failed to add new category',
+            response_code=500)
+
 
 @requires_authentication
 @requires_state_consistency
@@ -156,8 +175,8 @@ def delete_category(id):
 
         if not check_authorization(category.owner_id):
             return Result(
-                error = 'Permission denied',
-                response_code = 401)
+                error='Permission denied',
+                response_code=401)
 
         session.delete(category)
         session.commit()
@@ -165,37 +184,37 @@ def delete_category(id):
 
     except DataError:
         return Response(
-            error = 'Category id is not an integer',
-            response_code = 400)
+            error='Category id is not an integer',
+            response_code=400)
     except NoResultFound:
         return Response(
-            error = 'There is no category that corresponds '
-                    'to the specified id. (id: {})'.format(id),
-            response_code = 400)
+            error='There is no category that corresponds '
+            'to the specified id. (id: {})'.format(id),
+            response_code=400)
     except InternalError as e:
         print(e)
         return Response(
-            error = 'Failed to delete category with id: {}'.format(id),
-            response_code = 500)
+            error='Failed to delete category with id: {}'.format(id),
+            response_code=500)
     except IntegrityError as e:
         print(e)
         session.rollback()
         return Response(
-            error = 'Failed to delete category with id: {}'.format(id),
-            response_code = 400)
+            error='Failed to delete category with id: {}'.format(id),
+            response_code=400)
     except InvalidRequestError as e:
         print(e)
         return Response(
-            error = 'Failed to delete category with id: {}'.format(id),
-            response_code = 400)
+            error='Failed to delete category with id: {}'.format(id),
+            response_code=400)
     except:
         print("Unexpected error:", sys.exc_info()[0])
         return Response(
-            error = 'Failed to delete category with id: {}'.format(id),
-            response_code = 500)
+            error='Failed to delete category with id: {}'.format(id),
+            response_code=500)
 
 
-def get_items(id = None):
+def get_items(id=None):
     if id is not None:
         try:
             response = Response(session.query(Item).filter(
@@ -204,8 +223,8 @@ def get_items(id = None):
             response = Response([])
         except:
             response = Response(
-                error = 'Unknown error',
-                response_code = 500)
+                error='Unknown error',
+                response_code=500)
 
         return response
     else:
@@ -217,9 +236,10 @@ def get_items(id = None):
         return Response(item_list) if len(item_list) > 0\
             else Response([])
 
+
 @requires_authentication
 @requires_state_consistency
-def add_item(name, category_id, description = None, image_id = None):
+def add_item(name, category_id, description=None, image_id=None):
     owner_id = login_session['userid']
 
     try:
@@ -227,26 +247,43 @@ def add_item(name, category_id, description = None, image_id = None):
             .filter(Category.id == category_id).one()
     except NoResultFound:
         return Response(
-            error = 'Invalid category id',
-            response_code = 400)
+            error='Invalid category id',
+            response_code=400)
     except:
         return Response(
-            error = 'Unknown error',
-            response_code = 500)
+            error='Unknown error',
+            response_code=500)
 
     if not check_authorization(category.owner_id):
         return Result(
-            error = 'Permission denied for given category id.',
-            response_code = 401)
+            error='Permission denied for given category id.',
+            response_code=401)
 
+    if image_id:
+        try:
+            image = session.query(Image)\
+                .filter(Image.id == image_id).one()
+        except NoResultFound:
+            return Response(
+                error='Invalid image id',
+                response_code=400)
+        except:
+            return Response(
+                error='Unknown error',
+                response_code=500)
+
+        if not check_authorization(image.owner_id):
+            return Result(
+                error='Permission denied for given image id.',
+                response_code=401)
 
     try:
         newItem = Item(
-            name = name,
-            description = description,
-            owner_id = owner_id,
-            category_id = category_id,
-            image_id = image_id)
+            name=name,
+            description=description,
+            owner_id=owner_id,
+            category_id=category_id,
+            image_id=image_id)
 
         session.add(newItem)
         session.commit()
@@ -256,46 +293,52 @@ def add_item(name, category_id, description = None, image_id = None):
         print(e)
         session.rollback()
         return Response(
-            error = 'Invalid new item parameters. '
-                    '(name: {}, '
-                    'description: {}, '
-                    'category_id: {}, '
-                    'owner_id: {}, '
-                    'image_id: {})'
-                    .format(name,
-                        description,
-                        category_id,
-                        owner_id,
-                        image_id),
-            response_code = 400)
+            error='Invalid new item parameters. '
+            '(name: {}, '
+            'description: {}, '
+            'category_id: {}, '
+            'owner_id: {}, '
+            'image_id: {})'
+            .format(name,
+                    description,
+                    category_id,
+                    owner_id,
+                    image_id),
+            response_code=400)
     except InvalidRequestError as e:
         print(e)
         return Response(
-            error = 'Failed to add new item',
-            response_code = 400)
+            error='Failed to add new item',
+            response_code=400)
     except:
         print("Unexpected error:", sys.exc_info()[0])
         return Response(
-            error = 'Failed to add new item',
-            response_code = 500)
+            error='Failed to add new item',
+            response_code=500)
+
 
 @requires_authentication
 @requires_state_consistency
-def update_item(id, name = None, category_id = None, description = None, image_id = None):
+def update_item(
+        id,
+        name=None,
+        category_id=None,
+        description=None,
+        image_id=None):
     try:
         target = session.query(Item).filter(Item.id == id).one()
     except NoResultFound:
-        return Response(error = 'No result found',
-            response_code = 400)
+        return Response(error='No result found',
+                        response_code=400)
     except:
         return Response(
-            error = 'Unknown error',
-            response_code = 500)
+            error='Unknown error',
+            response_code=500)
     else:
         if not check_authorization(target.owner_id):
             return Result(
-                error = 'Permission denied',
-                response_code = 401)
+                error='Permission denied',
+                response_code=401)
 
         updated = False
 
@@ -306,8 +349,8 @@ def update_item(id, name = None, category_id = None, description = None, image_i
         if category_id and (target.category_id != category_id):
             if not check_authorization(target.category.owner_id):
                 return Result(
-                    error = 'Permission denied for given category id.',
-                    response_code = 401)
+                    error='Permission denied for given category id.',
+                    response_code=401)
 
             target.category_id = category_id
             updated = True
@@ -332,25 +375,26 @@ def update_item(id, name = None, category_id = None, description = None, image_i
                 print(e)
                 session.rollback()
                 return Response(
-                    error = 'Invalid new item parameters. '
-                            '(name: {}, '
-                            'description: {}, '
-                            'category_id: {}, '
-                            'image_id: {})'
-                            .format(name, description, category_id, image_id),
-                    response_code = 400)
+                    error='Invalid new item parameters. '
+                    '(name: {}, '
+                    'description: {}, '
+                    'category_id: {}, '
+                    'image_id: {})'
+                    .format(name, description, category_id, image_id),
+                    response_code=400)
             except InvalidRequestError as e:
                 print(e)
                 return Response(
-                    error = 'Failed to update item',
-                    response_code = 400)
+                    error='Failed to update item',
+                    response_code=400)
             except:
                 print("Unexpected error:", sys.exc_info()[0])
                 return Response(
-                    error = 'Failed to update item',
-                    response_code = 500)
+                    error='Failed to update item',
+                    response_code=500)
         else:
             return Response('Item has not changed')
+
 
 @requires_authentication
 @requires_state_consistency
@@ -360,8 +404,10 @@ def delete_item(id):
 
         if not check_authorization(target.owner_id):
             return Result(
-                error = 'Permission denied',
-                response_code = 401)
+                error='Permission denied',
+                response_code=401)
+
+        image = target.image
 
         session.delete(target)
         session.commit()
@@ -369,23 +415,147 @@ def delete_item(id):
         return Response('Success')
     except DataError:
         return Response(
-            error = 'Item id is not an integer',
-            response_code = 400)
+            error='Item id is not an integer',
+            response_code=400)
     except NoResultFound:
         return Response(
-            error = 'There is no item that corresponds '
-                    'to the specified id. (id: {})'.format(id),
-            response_code = 400)
+            error='There is no item that corresponds '
+            'to the specified id. (id: {})'.format(id),
+            response_code=400)
     except InternalError as e:
         print(e)
         return Response(
-            error = 'Failed to delete item with id: {}'.format(id),
-            response_code = 500)
+            error='Failed to delete item with id: {}'.format(id),
+            response_code=500)
     except:
         print("Unexpected error:", sys.exc_info()[0])
         return Response(
-            error = 'Failed to delete item with id: {}'.format(id),
-            response_code = 500)
+            error='Failed to delete item with id: {}'.format(id),
+            response_code=500)
+
+
+@requires_authentication
+@requires_state_consistency
+def add_image(path):
+    owner_id = login_session['userid']
+
+    try:
+        newimage = Image(path=path, owner_id=owner_id)
+
+        session.add(newimage)
+        session.commit()
+
+        return Response(newimage.tojson())
+    except IntegrityError as e:
+        print(e)
+        session.rollback()
+        return Response(
+            error='Invalid new image parameter. (path: {})'
+            .format(path),
+            response_code=400)
+    except InvalidRequestError as e:
+        print(e)
+        return Response(
+            error='Failed to add new image',
+            response_code=400)
+    except:
+        print("Unexpected error:", sys.exc_info()[0])
+        return Response(
+            error='Failed to add new image',
+            response_code=500)
+
+
+@requires_authentication
+@requires_state_consistency
+def update_image(id, path=None):
+    if not path:
+        return Response(error='Missing path parameter',
+                        response_code=400)
+
+    try:
+        target = session.query(Image).filter(Image.id == id).one()
+    except NoResultFound:
+        return Response(error='No result found',
+                        response_code=400)
+    except:
+        return Response(
+            error='Unknown error',
+            response_code=500)
+    else:
+        if not check_authorization(target.owner_id):
+            return Result(
+                error='Permission denied',
+                response_code=401)
+
+        if path == target.path:
+            return Response('Item has not changed')
+
+        file_path = uploaded_images.path(target.path)
+        os.remove(file_path)
+
+        target.path = path
+
+        try:
+            session.add(target)
+            session.commit()
+
+            return Response('Success')
+        except IntegrityError as e:
+            print(e)
+            session.rollback()
+            return Response(
+                error='Invalid new image parameters. (path: {})'
+                .format(path),
+                response_code=400)
+        except InvalidRequestError as e:
+            print(e)
+            return Response(
+                error='Failed to update image',
+                response_code=400)
+        except:
+            print("Unexpected error:", sys.exc_info()[0])
+            return Response(
+                error='Failed to update image',
+                response_code=500)
+
+
+@requires_authentication
+@requires_state_consistency
+def delete_image(id):
+    try:
+        target = session.query(Image).filter(Image.id == id).one()
+
+        if not check_authorization(target.owner_id):
+            return Result(
+                error='Permission denied',
+                response_code=401)
+
+        file_path = uploaded_images.path(target.path)
+        os.remove(file_path)
+
+        session.delete(target)
+        session.commit()
+
+        return Response('Success')
+    except DataError:
+        return Response(
+            error='Image id is not an integer',
+            response_code=400)
+    except NoResultFound:
+        return Response(
+            error='There is no image that corresponds '
+                  'to the specified id. (id: {})'.format(id),
+            response_code=400)
+    except InternalError as e:
+        print(e)
+        return Response(
+            error='Failed to delete image with id: {}'.format(id),
+            response_code=500)
+    except:
+        print("Unexpected error:", sys.exc_info()[0])
+        return Response(
+            error='Failed to delete image with id: {}'.format(id),
+            response_code=500)
 
 
 class RateLimit(object):
@@ -405,11 +575,14 @@ class RateLimit(object):
     remaining = property(lambda x: x.limit - x.current)
     over_limit = property(lambda x: x.current >= x.limit)
 
+
 def get_view_rate_limit():
     return getattr(g, '_view_rate_limit', None)
 
+
 def on_over_limit(limit):
-    return (jsonify({'data':'You hit the rate limit','error':'429'}),429)
+    return (jsonify({'data': 'You hit the rate limit', 'error': '429'}), 429)
+
 
 def ratelimit(limit, per=300, send_x_headers=True,
               over_limit=on_over_limit,
@@ -437,25 +610,33 @@ def inject_x_rate_headers(response):
         h.add('X-RateLimit-Reset', str(limit.reset))
     return response
 
+
 @app.route('/')
 @ratelimit(limit=30, per=60 * 1)
 def index():
-    state =  generate_state()
+    state = generate_state()
     login_session['state'] = state
 
     return render_template('index.html', STATE=state)
+
 
 @app.route('/gconnect', methods=['POST'])
 @requires_state_consistency
 @ratelimit(limit=30, per=60 * 1)
 def gconnect():
     try:
-        idinfo = client.verify_id_token(request.data, '1014623565180-lm2sl4gftjv5r8jhgikg0ti9lcldol8c.apps.googleusercontent.com')
+        idinfo = client.verify_id_token(
+            request.data,
+            '1014623565180-lm2sl4gftjv5r8jhgikg0ti9lcldol8c'
+            '.apps.googleusercontent.com')
 
-        if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
+        if idinfo['iss'] not in ['accounts.google.com',
+                                 'https://accounts.google.com']:
             raise crypt.AppIdentityError("Wrong issuer.")
     except crypt.AppIdentityError:
-        return (jsonify({'data':'Invalid authentication issuer','error':'401'}),401)
+        return (jsonify(
+            {'data': 'Invalid authentication issuer',
+             'error': '401'}), 401)
 
     user = get_user(idinfo['email'])
 
@@ -463,11 +644,15 @@ def gconnect():
         user = add_user(idinfo['email'], idinfo['name'])
 
         if user is None:
-            return (jsonify({'data':'Internal Error','error':'500'}),500)
+            return (jsonify({'data': 'Internal Error', 'error': '500'}), 500)
 
     login_session['userid'] = user.id
 
-    return Response({'user_id': user.id,'user_name': idinfo['name'], 'user_picture': idinfo['picture']})
+    return Response(
+        {'user_id': user.id,
+         'user_name': idinfo['name'],
+         'user_picture': idinfo['picture']})
+
 
 @app.route('/gdisconnect', methods=['POST'])
 @ratelimit(limit=30, per=60 * 1)
@@ -478,11 +663,12 @@ def gdisconnect():
 
     return Response('User disconnected successfully')
 
+
 @app.route('/api/category',
-    defaults={'category': None},
-    methods=['GET', 'POST', 'DELETE'])
+           defaults={'category': None},
+           methods=['GET', 'POST', 'DELETE'])
 @app.route('/api/category/<int:category>',
-    methods=['GET', 'DELETE'])
+           methods=['GET', 'DELETE'])
 @ratelimit(limit=10, per=60 * 1)
 def api_category(category):
     if request.method == 'GET':
@@ -490,11 +676,11 @@ def api_category(category):
 
     elif request.method == 'POST':
         if 'name' in request.json:
-            return add_category(name = request.json['name'])
+            return add_category(name=request.json['name'])
         else:
             return Response(
-                error = 'Missing "name" parameter',
-                response_code = 400)
+                error='Missing "name" parameter',
+                response_code=400)
 
     elif request.method == 'DELETE':
         if category:
@@ -503,18 +689,19 @@ def api_category(category):
             return delete_category(request.json['id'])
         else:
             return Response(
-                error = 'Missing "id" parameter',
-                response_code = 400)
+                error='Missing "id" parameter',
+                response_code=400)
     else:
         return Response(
-            error = 'Method is not yet implemented',
-            response_code = 400)
+            error='Method is not yet implemented',
+            response_code=400)
+
 
 @app.route('/api/item',
-    defaults={'item': None},
-    methods=['GET', 'POST', 'DELETE'])
+           defaults={'item': None},
+           methods=['GET', 'POST', 'DELETE'])
 @app.route('/api/item/<int:item>',
-    methods=['GET', 'DELETE', 'PATCH'])
+           methods=['GET', 'DELETE', 'PATCH'])
 @ratelimit(limit=10, per=60 * 1)
 def api_item(item):
     if request.method == 'GET':
@@ -525,9 +712,9 @@ def api_item(item):
             return add_item(**request.json)
         else:
             return Response(
-                error = 'Missing "name" '
-                        'or "category_id" parameters',
-                response_code = 400)
+                error='Missing "name" '
+                      'or "category_id" parameters',
+                response_code=400)
 
     elif request.method == 'DELETE':
         if item:
@@ -536,17 +723,76 @@ def api_item(item):
             return delete_item(request.json['id'])
         else:
             return Response(
-                error = 'Missing "id" parameter',
-                response_code = 400)
+                error='Missing "id" parameter',
+                response_code=400)
 
     elif request.method == 'PATCH':
         return update_item(item, **request.json)
     else:
         return Response(
-            error = 'Method is not yet implemented',
-            response_code = 405)
+            error='Method is not yet implemented',
+            response_code=405)
+
+
+@app.route('/api/image',
+           defaults={'image': None},
+           methods=['GET', 'POST', 'DELETE'])
+@app.route('/api/image/<int:image>',
+           methods=['GET', 'DELETE', 'PATCH'])
+@ratelimit(limit=10, per=60 * 1)
+def api_image(image):
+    if request.method == 'GET':
+        return get_images(image)
+
+    elif request.method == 'POST':
+        image_file = request.files.get('image')
+
+        if image_file:
+            try:
+                filename = uploaded_images.save(image_file)
+            except UploadNotAllowed:
+                return Response(
+                    error='Image upload not allowed',
+                    response_code=400)
+            else:
+                return add_image(filename)
+        else:
+            return Response(
+                error='Missing image file ',
+                response_code=400)
+
+    elif request.method == 'DELETE':
+        if image:
+            return delete_image(image)
+        elif 'id' in request.json:
+            return delete_image(request.json['id'])
+        else:
+            return Response(
+                error='Missing "id" parameter',
+                response_code=400)
+
+    elif request.method == 'PATCH':
+        image_file = request.files.get('image')
+
+        if image_file:
+            try:
+                filename = uploaded_images.save(image_file)
+            except UploadNotAllowed:
+                return Response(
+                    error='Image upload not allowed',
+                    response_code=400)
+            else:
+                return update_image(image, filename)
+        else:
+            return Response(
+                error='Missing image file ',
+                response_code=400)
+    else:
+        return Response(
+            error='Method is not yet implemented',
+            response_code=405)
 
 if __name__ == '__main__':
     app.secret_key = 'i3Ldm4dv8c9sBsc45A3vx6sO3plsn'
     app.debug = True
-    app.run(host = '0.0.0.0', port = 5000)
+    app.run(host='0.0.0.0', port=5000)
