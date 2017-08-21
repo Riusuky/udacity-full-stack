@@ -202,12 +202,33 @@ body {
     color: #de5050;
 }
 
+.item-list__new-item {
+    height: 100px;
+    display: flex;
+    flex-flow: row nowrap;
+    justify-content: center;
+    align-items: center;
+    background: #c7c7c7;
+    border-radius: 5px;
+    border: 2px dashed white;
+    color: white;
+    cursor: pointer;
+}
+
+.item-list__new-item:active {
+    background: #de5050;
+}
+
+.item-list__new-item.hidden {
+    display: none;
+}
+
 .item-list__item {
     display: grid;
-    grid-template:  "title title title"
-                    "image description first-button"
-                    "image description second-button"
-                    / 150px auto 50px;
+    grid-template:  "title title category category"
+                    "image description description first-button"
+                    "image description description second-button"
+                    / 150px auto 200px 50px;
     padding: 10px;
     background: #c7c7c7;
     border-radius: 5px;
@@ -222,6 +243,11 @@ body {
     grid-area: image;
     width: 100%;
     border-radius: 5px;
+    background: #de5050;
+    min-height: 120px;
+    padding: 20px 0 0 0;
+    text-align: center;
+    color: white;
 }
 
 .item-list__item__image-real-input {
@@ -236,9 +262,22 @@ body {
     border-radius: 5px;
 }
 
+.item-list__item__category {
+    grid-area: category;
+    margin: 0 0 5px 5px;
+    color: #3a3a3a;
+    border-radius: 5px;
+}
+
 .item-list__item__title.input {
     background: #e6e6e6;
     padding: 4px;
+}
+
+.item-list__item__category.input {
+    background: #e6e6e6;
+    padding: 4px;
+    cursor: pointer;
 }
 
 .item-list__item__description {
@@ -278,6 +317,7 @@ body {
     margin: auto 0;
     height: 80%;
     min-height: 45px;
+    cursor: pointer;
 }
 
 .item-list__item__delete-button:active,
@@ -288,6 +328,7 @@ body {
 }
 
 .item-list__item__title.input,
+.item-list__item__category.input,
 .item-list__item__image.input,
 .item-list__item__description.input,
 .item-list__item__save-button,
@@ -296,6 +337,7 @@ body {
 }
 
 .item-list__item.editmode .item-list__item__title.input,
+.item-list__item.editmode .item-list__item__category.input,
 .item-list__item.editmode .item-list__item__image.input,
 .item-list__item.editmode .item-list__item__description.input,
 .item-list__item.editmode .item-list__item__save-button,
@@ -304,9 +346,15 @@ body {
 }
 
 .item-list__item.editmode .item-list__item__title,
+.item-list__item.editmode .item-list__item__category,
 .item-list__item.editmode .item-list__item__image,
 .item-list__item.editmode .item-list__item__description,
 .item-list__item.editmode .item-list__item__edit-button,
 .item-list__item.editmode .item-list__item__delete-button {
+    display: none;
+}
+
+.item-list__item__delete-button.hidden,
+.item-list__item__edit-button.hidden {
     display: none;
 }

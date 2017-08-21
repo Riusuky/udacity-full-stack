@@ -9,6 +9,8 @@ from sqlalchemy.orm import relationship, backref
 
 from sqlalchemy import create_engine
 
+from flask import url_for
+
 # import logging
 #
 # logging.basicConfig()
@@ -106,12 +108,15 @@ class Item(Base):
         back_populates = 'items')
 
     def tojson(self):
+        image_path = 'img/no_image.svg' if not self.image else self.image.path
+
         return {
             'id': self.id,
             'name': self.name,
             'description': self.description,
             'category_id': self.category_id,
             'image_id': self.image_id,
+            'image_url': url_for('static', filename=image_path),
             'created_on': self.created_on,
             'owner_id': self.owner_id}
 

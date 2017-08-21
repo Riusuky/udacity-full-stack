@@ -155,7 +155,9 @@ def delete_category(id):
         category = session.query(Category).filter(Category.id == id).one()
 
         if not check_authorization(category.owner_id):
-            return (jsonify({'data':'Permission denied','error':'401'}),401)
+            return Result(
+                error = 'Permission denied',
+                response_code = 401)
 
         session.delete(category)
         session.commit()
@@ -221,16 +223,35 @@ def add_item(name, category_id, description = None, image_id = None):
     owner_id = login_session['userid']
 
     try:
-        session.add(
-            Item(
-                name = name,
-                description = description,
-                owner_id = owner_id,
-                category_id = category_id,
-                image_id = image_id))
+        category = session.query(Category)\
+            .filter(Category.id == category_id).one()
+    except NoResultFound:
+        return Response(
+            error = 'Invalid category id',
+            response_code = 400)
+    except:
+        return Response(
+            error = 'Unknown error',
+            response_code = 500)
+
+    if not check_authorization(category.owner_id):
+        return Result(
+            error = 'Permission denied for given category id.',
+            response_code = 401)
+
+
+    try:
+        newItem = Item(
+            name = name,
+            description = description,
+            owner_id = owner_id,
+            category_id = category_id,
+            image_id = image_id)
+
+        session.add(newItem)
         session.commit()
 
-        return Response('Success')
+        return Response(newItem.tojson())
     except IntegrityError as e:
         print(e)
         session.rollback()
@@ -239,7 +260,7 @@ def add_item(name, category_id, description = None, image_id = None):
                     '(name: {}, '
                     'description: {}, '
                     'category_id: {}, '
-                    'owner_id: {}'
+                    'owner_id: {}, '
                     'image_id: {})'
                     .format(name,
                         description,
@@ -272,7 +293,9 @@ def update_item(id, name = None, category_id = None, description = None, image_i
             response_code = 500)
     else:
         if not check_authorization(target.owner_id):
-            return (jsonify({'data':'Permission denied','error':'401'}),401)
+            return Result(
+                error = 'Permission denied',
+                response_code = 401)
 
         updated = False
 
@@ -281,6 +304,11 @@ def update_item(id, name = None, category_id = None, description = None, image_i
             updated = True
 
         if category_id and (target.category_id != category_id):
+            if not check_authorization(target.category.owner_id):
+                return Result(
+                    error = 'Permission denied for given category id.',
+                    response_code = 401)
+
             target.category_id = category_id
             updated = True
 
@@ -331,7 +359,9 @@ def delete_item(id):
         target = session.query(Item).filter(Item.id == id).one()
 
         if not check_authorization(target.owner_id):
-            return (jsonify({'data':'Permission denied','error':'401'}),401)
+            return Result(
+                error = 'Permission denied',
+                response_code = 401)
 
         session.delete(target)
         session.commit()

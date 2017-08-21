@@ -37,10 +37,6 @@
                 <hr>
 
                 <ul class="menu-list__item-container">
-                    <!-- <li class="menu-list__item">
-                        <button class="menu-list__delete-button fa fa-trash-o" type="button" name="button"></button>
-                        <span>A</span>
-                    </li> -->
                     <li class="menu-list__new-item hidden">
                         <input class="menu-list__input" type="text" placeholder="New Category" name="" value="">
                     </li>
@@ -55,19 +51,8 @@
                 <hr>
 
                 <ul class="item-list__container">
-                    <li class="item-list__item">
-                        <h3 class="item-list__item__title">Title</h3>
-                        <img class="item-list__item__image" src="{{ url_for('static', filename='img/no_image.svg') }}">
-                        <p class="item-list__item__description">Description</p>
-                        <button class="item-list__item__edit-button fa fa-pencil" type="button" name="button"></button>
-                        <button class="item-list__item__delete-button fa fa-trash-o" type="button" name="button"></button>
-
-                        <input class="item-list__item__title input" placeholder="Title" type="text" name="" value="Title">
-                        <input class="item-list__item__image input" type="image" src="{{ url_for('static', filename='img/no_image.svg') }}">
-                        <input class="item-list__item__image-real-input" type="file" name="" value="">
-                        <textarea class="item-list__item__description input" placeholder="Description"></textarea>
-                        <button class="item-list__item__save-button fa fa-check" type="button" name="button"></button>
-                        <button class="item-list__item__cancel-button fa fa-times" type="button" name="button"></button>
+                    <li class="item-list__new-item hidden">
+                        <h3>Add new Item</h3>
                     </li>
                 </ul>
             </section>
@@ -93,6 +78,7 @@
                 };
 
                 var categoryMenuView = new CategoryMenuView();
+                var itemListView = new ItemListView();
 
                 gapi.load('auth2', function(){
                     var user = null;
@@ -201,6 +187,12 @@
                 categoryCollection.fetch({
                     error: function() {
                         window.alert('Failed to fetch categories from server');
+                    }
+                });
+
+                itemCollection.fetch({
+                    error: function() {
+                        window.alert('Failed to fetch items from server');
                     }
                 });
             })();
