@@ -69,8 +69,10 @@
             (function() {
                 var backboneSync = Backbone.sync;
 
+                // Store current state for future requests (Prevents CSFR)
                 categoryCollection.userState = '{{STATE}}';
 
+                // Add state for backbone CRUD requests
                 Backbone.sync = function (method, model, options) {
                     options.headers = {
                         'state': '{{STATE}}'
@@ -82,6 +84,7 @@
                 var categoryMenuView = new CategoryMenuView();
                 var itemListView = new ItemListView();
 
+                // Callback after google client authentication API has loaded
                 gapi.load('auth2', function(){
                     var user = null;
 
@@ -89,7 +92,9 @@
                     var $userPicture = $('.header__login-img');
                     var $loginButtonText = $('.header__login-text');
 
+                    // Callback called after google has authenticated the user
                     function signInToBackend(id_token) {
+                        // Tell the server that the user has authenticated
                         $.ajax({
                             type: 'POST',
                             url: '/gconnect',
@@ -98,6 +103,7 @@
                             contentType: 'application/octet-stream; charset=utf-8',
                             headers: { 'state': '{{STATE}}' }
                         }).done(function(result) {
+                            // Change layout for a successful authentication
                             $loginButtonText.text('Sign out');
 
                             categoryMenuView.setInputVisibility();
@@ -114,6 +120,7 @@
                         });
                     }
 
+                    // Start google authentication process
                     function signIn() {
                         auth2.signIn().then(
                             function(googleUser) {
@@ -129,14 +136,18 @@
                         );
                     }
 
+                    // Start sign off process
                     function signOut() {
+                        // Begin by requesting a signoff from the server
                         $.ajax({
                             type: 'POST',
                             url: '/gdisconnect',
                             headers: { 'state': '{{STATE}}' }
                         }).done(function(result) {
+                            // Then inform google to sign the user off
                             auth2.signOut().then(
                                 function() {
+                                    // Change layout back to its original state
                                     $loginButtonText.text('Sign in');
 
                                     categoryMenuView.setInputVisibility(false);
@@ -157,12 +168,14 @@
                         });
                     }
 
+                    // Initializes google client API
                     var auth2 = gapi.auth2.init({
                         client_id: '1014623565180-lm2sl4gftjv5r8jhgikg0ti9lcldol8c.apps.googleusercontent.com',
                         cookiepolicy: 'single_host_origin',
                         scope: 'profile email'
                     });
 
+                    // After initialization, attach sign in button event and checks if the user is already signed in
                     auth2.then(
                     function() {
                         if(auth2.isSignedIn.get()) {
@@ -186,6 +199,7 @@
                     );
                 });
 
+                // Fetch data from server (categories and items)
                 categoryCollection.fetch({
                     error: function() {
                         window.alert('Failed to fetch categories from server');

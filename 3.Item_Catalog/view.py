@@ -35,6 +35,7 @@ db_session.configure(bind=engine)
 session = db_session()
 
 app = Flask(__name__)
+# Configure image upload destination
 app.config['UPLOADED_IMAGES_DEST'] = 'static/item_images'
 app.config['UPLOADED_IMAGES_URL'] = 'item_images/'
 
@@ -42,6 +43,7 @@ configure_uploads(app, uploaded_images)
 
 
 def Response(response={}, error=None, response_code=200):
+    """Helper function to generate a request response."""
     if response_code == 200 and error:
         response_code = 500
 
@@ -52,11 +54,14 @@ def Response(response={}, error=None, response_code=200):
 
 
 def generate_state():
+    """Generates a random token for session state."""
     return ''.join(random.choice(string.ascii_uppercase + string.digits)
                    for x in range(32))
 
 
 def requires_authentication(f):
+    """Decorator that checks if the user is currently logged in."""
+
     def decorator(*args, **kwargs):
         if 'userid' not in login_session:
             return Response(
@@ -68,6 +73,7 @@ def requires_authentication(f):
 
 
 def requires_state_consistency(f):
+    """Decorator taht checks if request state parameters is correct."""
     def decorator(*args, **kwargs):
         if ('state' not in request.headers)
         or (request.headers['state'] != login_session['state']):
@@ -86,6 +92,7 @@ def check_authorization(userid):
 
 
 def get_user(email):
+    """Searches and returns the user that corresponds to the given email."""
     try:
         return session.query(User).filter(
             User.email == email).one()
@@ -96,6 +103,7 @@ def get_user(email):
 
 
 def add_user(email, name):
+    """Creates user entry."""
     try:
         new_user = User(email=email, name=name)
 
@@ -115,6 +123,8 @@ def add_user(email, name):
 
 
 def get_categories(id=None):
+    """If id is set, then it returns the category that matches the id,
+    else it returns all category entries."""
     if id is not None:
         try:
             response = Response(session.query(Category).filter(
@@ -140,6 +150,7 @@ def get_categories(id=None):
 @requires_authentication
 @requires_state_consistency
 def add_category(name):
+    """Creates category entry."""
     owner_id = login_session['userid']
 
     try:
@@ -170,6 +181,7 @@ def add_category(name):
 @requires_authentication
 @requires_state_consistency
 def delete_category(id):
+    """Deletes category that matches given id."""
     try:
         category = session.query(Category).filter(Category.id == id).one()
 
@@ -215,6 +227,8 @@ def delete_category(id):
 
 
 def get_items(id=None):
+    """If id is set, then it returns the item that matches the id,
+    else it returns all item entries."""
     if id is not None:
         try:
             response = Response(session.query(Item).filter(
@@ -240,8 +254,10 @@ def get_items(id=None):
 @requires_authentication
 @requires_state_consistency
 def add_item(name, category_id, description=None, image_id=None):
+    """Creates item entry."""
     owner_id = login_session['userid']
 
+    # This ensures that the category set is also owned by the user
     try:
         category = session.query(Category)\
             .filter(Category.id == category_id).one()
@@ -259,6 +275,7 @@ def add_item(name, category_id, description=None, image_id=None):
             error='Permission denied for given category id.',
             response_code=401)
 
+    # This ensures that the image set (if set) is also owned by the user
     if image_id:
         try:
             image = session.query(Image)\
@@ -325,6 +342,7 @@ def update_item(
         category_id=None,
         description=None,
         image_id=None):
+    """Updates item entry."""
     try:
         target = session.query(Item).filter(Item.id == id).one()
     except NoResultFound:
@@ -347,7 +365,20 @@ def update_item(
             updated = True
 
         if category_id and (target.category_id != category_id):
-            if not check_authorization(target.category.owner_id):
+            # This ensures that the category set is also owned by the user
+            try:
+                category = session.query(Category)\
+                    .filter(Category.id == category_id).one()
+            except NoResultFound:
+                return Response(
+                    error='Invalid category id',
+                    response_code=400)
+            except:
+                return Response(
+                    error='Unknown error',
+                    response_code=500)
+
+            if not check_authorization(category.owner_id):
                 return Result(
                     error='Permission denied for given category id.',
                     response_code=401)
@@ -360,6 +391,24 @@ def update_item(
             updated = True
 
         if image_id and (target.image_id != image_id):
+            # This ensures that the image set
+            # (if set) is also owned by the user
+            try:
+                image = session.query(Image)\
+                    .filter(Image.id == image_id).one()
+            except NoResultFound:
+                return Response(
+                    error='Invalid image id',
+                    response_code=400)
+            except:
+                return Response(
+                    error='Unknown error',
+                    response_code=500)
+
+            if not check_authorization(image.owner_id):
+                return Result(
+                    error='Permission denied for given image id.',
+                    response_code=401)
             target.image_id = image_id
             updated = True
 
@@ -399,6 +448,7 @@ def update_item(
 @requires_authentication
 @requires_state_consistency
 def delete_item(id):
+    """Deletes item that matches given id."""
     try:
         target = session.query(Item).filter(Item.id == id).one()
 
@@ -437,6 +487,7 @@ def delete_item(id):
 @requires_authentication
 @requires_state_consistency
 def add_image(path):
+    """Create image entry."""
     owner_id = login_session['userid']
 
     try:
@@ -468,6 +519,9 @@ def add_image(path):
 @requires_authentication
 @requires_state_consistency
 def update_image(id, path=None):
+    """Updates image path entry.
+
+    It also deletes image associated with old path."""
     if not path:
         return Response(error='Missing path parameter',
                         response_code=400)
@@ -522,6 +576,7 @@ def update_image(id, path=None):
 @requires_authentication
 @requires_state_consistency
 def delete_image(id):
+    """Deletes image and image file that matches given id."""
     try:
         target = session.query(Image).filter(Image.id == id).one()
 
@@ -559,6 +614,7 @@ def delete_image(id):
 
 
 class RateLimit(object):
+    """Class used to control access frequency for a given endpoint."""
     expiration_window = 10
 
     def __init__(self, key_prefix, limit, per, send_x_headers):
@@ -588,6 +644,7 @@ def ratelimit(limit, per=300, send_x_headers=True,
               over_limit=on_over_limit,
               scope_func=lambda: request.remote_addr,
               key_func=lambda: request.endpoint):
+    """Decorator used to control access frequency for given function."""
     def decorator(f):
         def rate_limited(*args, **kwargs):
             key = 'rate-limit/%s/%s/' % (key_func(), scope_func())
@@ -602,6 +659,7 @@ def ratelimit(limit, per=300, send_x_headers=True,
 
 @app.after_request
 def inject_x_rate_headers(response):
+    """Add limits feedback on response headers."""
     limit = get_view_rate_limit()
     if limit and limit.send_x_headers:
         h = response.headers
@@ -614,6 +672,7 @@ def inject_x_rate_headers(response):
 @app.route('/')
 @ratelimit(limit=30, per=60 * 1)
 def index():
+    """Route for the Item Catalog App page."""
     state = generate_state()
     login_session['state'] = state
 
@@ -624,6 +683,7 @@ def index():
 @requires_state_consistency
 @ratelimit(limit=30, per=60 * 1)
 def gconnect():
+    """Endpoint that authenticates user."""
     try:
         idinfo = client.verify_id_token(
             request.data,
@@ -659,6 +719,7 @@ def gconnect():
 @requires_authentication
 @requires_state_consistency
 def gdisconnect():
+    """Endpoint that signs user off the application."""
     del login_session['userid']
 
     return Response('User disconnected successfully')
@@ -671,6 +732,7 @@ def gdisconnect():
            methods=['GET', 'DELETE'])
 @ratelimit(limit=10, per=60 * 1)
 def api_category(category):
+    """Endpoint for the category CRUD operations."""
     if request.method == 'GET':
         return get_categories(category)
 
@@ -704,6 +766,7 @@ def api_category(category):
            methods=['GET', 'DELETE', 'PATCH'])
 @ratelimit(limit=10, per=60 * 1)
 def api_item(item):
+    """Endpoint for the item CRUD operations."""
     if request.method == 'GET':
         return get_items(item)
 
@@ -741,6 +804,7 @@ def api_item(item):
            methods=['GET', 'DELETE', 'PATCH'])
 @ratelimit(limit=10, per=60 * 1)
 def api_image(image):
+    """Endpoint for the image CRUD operations."""
     if request.method == 'GET':
         return get_images(image)
 

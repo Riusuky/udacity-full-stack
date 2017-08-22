@@ -1,12 +1,9 @@
 'use strict';
 
+// Enter keycode
 var ENTER_KEY = 13;
-//
-// function SetClassModifier(selection, baseClass, modifier) {
-//     selection.attr('class', selection.attr('class').replace(new RegExp(`${baseClass}[-\\w]*`), baseClass+modifier));
-// }
 
-
+// Models
 var CategoryModel = Backbone.Model.extend({
     defaults: {
       name: 'name'
@@ -34,6 +31,8 @@ var ItemModel = Backbone.Model.extend({
     }
 });
 
+
+// Collections
 var CategoryCollection = Backbone.Collection.extend({
     model: CategoryModel,
     url: '/api/category',
@@ -42,10 +41,12 @@ var CategoryCollection = Backbone.Collection.extend({
         this.on('change:selected', this.onSelectCategory);
     },
 
+    // Returns a selected category
     selected: function() {
         return this.find(category => category.selected);
     },
 
+    // Unselect previous selected category
     onSelectCategory: function(category) {
         if(category.selected) {
             if( this.lastSelection && (this.lastSelection != category) ) {
@@ -61,6 +62,14 @@ var CategoryCollection = Backbone.Collection.extend({
         this.trigger('selectionChanged', category);
     },
 
+    // Sets the current user_id
+    setUserId: function(userId) {
+        this.userId = userId;
+
+        this.trigger('userChanged');
+    }
+
+    // Return all categories for the current user_id
     getByOwner: function() {
         if(this.userId) {
             return this.where({owner_id: this.userId});
@@ -68,12 +77,6 @@ var CategoryCollection = Backbone.Collection.extend({
 
         return [];
     },
-
-    setUserId: function(userId) {
-        this.userId = userId;
-
-        this.trigger('userChanged');
-    }
 });
 
 var ItemCollection = Backbone.Collection.extend({
@@ -88,6 +91,9 @@ var ItemCollection = Backbone.Collection.extend({
 var categoryCollection = new CategoryCollection();
 var itemCollection = new ItemCollection();
 
+
+// Views
+// View for a single category
 var CategoryView = Backbone.View.extend({
     tagName: 'li',
     className: 'menu-list__item',
@@ -107,6 +113,7 @@ var CategoryView = Backbone.View.extend({
         this.listenTo(categoryCollection, 'userChanged', this.render);
     },
 
+    // Delete category from server
     deleteCategory: function(event) {
         event.stopPropagation();
 
@@ -118,11 +125,13 @@ var CategoryView = Backbone.View.extend({
         });
     },
 
+    // Remove category from layout
     onDestroy:function() {
         this.remove();
         this.off();
     },
 
+    // Update element
     render: function() {
         this.$el.html(this.template(this.model));
 
@@ -133,11 +142,13 @@ var CategoryView = Backbone.View.extend({
         return this;
     },
 
+    // Select category
     onClick: function() {
         this.model.setSelected(!this.model.selected);
     }
 });
 
+// View for a single item
 var ItemView = Backbone.View.extend({
     tagName: 'li',
     className: 'item-list__item',
@@ -187,6 +198,7 @@ var ItemView = Backbone.View.extend({
         this.listenTo(categoryCollection, 'reset', this.render);
     },
 
+    // Delete item from server (if it has a model attached)
     onDelete: function(event) {
         event.stopPropagation();
 
@@ -211,6 +223,7 @@ var ItemView = Backbone.View.extend({
         });
     },
 
+    // Change layout to editable mode
     onEdit: function(event) {
         event.stopPropagation();
 
@@ -223,6 +236,7 @@ var ItemView = Backbone.View.extend({
         this.setEditMode(true);
     },
 
+    // Cancel editmode (if it has no model attached, then delete this view)
     onCancel: function(event) {
         event.stopPropagation();
 
@@ -244,6 +258,7 @@ var ItemView = Backbone.View.extend({
         }
     },
 
+    // Update item data on server and refresh element (if it does not have a model attached, then create item)
     onSave: function(event) {
         event.stopPropagation();
 
@@ -252,6 +267,7 @@ var ItemView = Backbone.View.extend({
         if(this.editMode) {
             if(this.model) {
                 if(this.imageInputFile) {
+                    // Updates image and then updates the item and refreshes
                     var formData = new FormData();
 
                     formData.append('image', this.imageInputFile, this.imageInputFile.name);
@@ -289,6 +305,7 @@ var ItemView = Backbone.View.extend({
                     });
                 }
                 else {
+                    // updates the item on the server
                     this.model.save({
                         name: self.$titleInput.val(),
                         description: self.$descriptionInput.val(),
@@ -307,6 +324,8 @@ var ItemView = Backbone.View.extend({
             }
             else {
                 if(this.imageInputFile) {
+                    // Create the image and then the item
+
                     var formData = new FormData();
 
                     formData.append('image', this.imageInputFile, this.imageInputFile.name);
@@ -362,33 +381,52 @@ var ItemView = Backbone.View.extend({
         }
     },
 
+    // Remove element from layout
     onDestroy:function() {
         this.remove();
         this.off();
     },
 
+    // Open image picker
     pickImage: function() {
         this.$fileInput.click();
     },
 
+    // Callback after a image has been selected.
     setImage: function() {
         if(this.$fileInput[0].files.length > 0) {
-            this.imageInputFile = this.$fileInput[0].files[0];
+            var typeIsValid = false;
 
-            var reader = new FileReader();
-
-            var self = this;
-
-            reader.onload = function (e) {
-                self.$imageInput[0].src = e.target.result;
+            for(var i = 0; i < ['image/jpeg', 'image/pjpeg', 'image/png'].length; i++) {
+                if(this.$fileInput[0].files[0].type === fileTypes[i]) {
+                    typeIsValid = true;
+                    break;
+                }
             }
 
-            reader.readAsDataURL(this.imageInputFile);
+            if(typeIsValid) {
+                this.imageInputFile = this.$fileInput[0].files[0];
+
+                // Display image preview
+                var reader = new FileReader();
+
+                var self = this;
+
+                reader.onload = function (e) {
+                    self.$imageInput[0].src = e.target.result;
+                }
+
+                reader.readAsDataURL(this.imageInputFile);
+            }
+            else {
+                window.alert('Selected file is not a valid image type.');
+            }
 
             this.$fileInput.val('');
         }
     },
 
+    // Updates element whether it has a model attached or not.
     render: function() {
         if(this.model) {
             var myCategory = categoryCollection.get(this.model.get('category_id'));
@@ -456,11 +494,11 @@ var ItemView = Backbone.View.extend({
     },
 });
 
+
 var CategoryMenuView = Backbone.View.extend({
     el: ".menu-list",
 
     events: {
-    //   'blur .menu-list__input': 'createCategory',
       'keypress .menu-list__input': 'createCategory',
     },
 
@@ -474,15 +512,18 @@ var CategoryMenuView = Backbone.View.extend({
         this.render();
     },
 
+    // Enable/Disable the new category field
     setInputVisibility: function(visible = true) {
         this.$newCategoryButton.parent().toggleClass('hidden', !visible);
     },
 
+    // Add view for new category
     onAdd: function(category) {
         var newCategory = new CategoryView({ model: category });
         this.$container.prepend( newCategory.render().el );
     },
 
+    // Refreshes item collection (deleting an category also deletes all items attached to it)
     onRemove: function(terrain) {
         itemCollection.fetch({
             error: function() {
@@ -491,6 +532,7 @@ var CategoryMenuView = Backbone.View.extend({
         });
     },
 
+    // Updates menu element
     render: function() {
         this.$container.find('.menu-list__item').remove();
 
@@ -499,6 +541,7 @@ var CategoryMenuView = Backbone.View.extend({
         categoryCollection.chain().sortBy(function(category){ return category.get('name'); }).reverse().each(this.onAdd, this);
     },
 
+    // Create a new category on the server
     createCategory: function() {
         if ( ((event.type == 'keypress') && (event.which !== ENTER_KEY)) || !this.$newCategoryButton.val().trim() ) {
             return;
@@ -543,12 +586,14 @@ var ItemListView = Backbone.View.extend({
         this.newItemInput = null;
     },
 
+    // Add view for new item
     addItem: function(category) {
         var newCategory = new ItemView({ model: category });
 
         this.$container.prepend( newCategory.render().$el );
     },
 
+    // Callback called every time an item starts being edited. (It ensures that only one item is being edited at a time)
     onEditItem: function(item, itemView) {
         if(this.newItemInput) {
             this.cancelNewItem();
@@ -561,6 +606,7 @@ var ItemListView = Backbone.View.extend({
         this.lastEditingItem = itemView;
     },
 
+    // Disable editmode from last item being edited
     cancelLastEditingItem: function() {
         if(this.lastEditingItem && this.lastEditingItem.editMode) {
             this.lastEditingItem.setEditMode(false);
@@ -569,6 +615,7 @@ var ItemListView = Backbone.View.extend({
         }
     },
 
+    // Update item list element
     render: function() {
         var selectedCategory = categoryCollection.selected();
 
@@ -601,6 +648,7 @@ var ItemListView = Backbone.View.extend({
         this.$newItemButton.toggleClass('hidden', !enableNewItemButton && !this.newItemInput);
     },
 
+    // Creates the form fom a new item
     addNewItem: function() {
         this.newItemInput = new ItemView();
 
@@ -613,6 +661,7 @@ var ItemListView = Backbone.View.extend({
         this.cancelLastEditingItem();
     },
 
+    // Deletes form for new item if it exists
     cancelNewItem: function() {
         if(this.newItemInput) {
             this.stopListening(this.newItemInput);

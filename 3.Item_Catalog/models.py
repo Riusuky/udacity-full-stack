@@ -25,6 +25,7 @@ Base = declarative_base()
 
 
 class User(Base):
+    """Implements SQL ORM for users"""
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True)
@@ -54,6 +55,7 @@ class User(Base):
 
 
 class Category(Base):
+    """Implements SQL ORM for categories"""
     __tablename__ = 'categories'
 
     id = Column(Integer, primary_key=True)
@@ -84,6 +86,7 @@ class Category(Base):
 
 # TODO: handle orphan images
 class Image(Base):
+    """Implements SQL ORM for images"""
     __tablename__ = 'images'
 
     id = Column(Integer, primary_key=True)
@@ -104,6 +107,7 @@ class Image(Base):
 
 
 class Item(Base):
+    """Implements SQL ORM for items"""
     __tablename__ = 'items'
 
     id = Column(Integer, primary_key=True)
