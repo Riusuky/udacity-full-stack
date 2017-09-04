@@ -8,6 +8,7 @@ The server infrastructure used to complete this project was the [Amazon Lightsai
 
 * IP: `18.220.125.255`
 * URL: [http://ec2-18-220-125-255.us-east-2.compute.amazonaws.com](http://ec2-18-220-125-255.us-east-2.compute.amazonaws.com)
+* SSH Port: `2200`
 
 ## Server Set Up
 

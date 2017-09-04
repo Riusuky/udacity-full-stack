@@ -397,7 +397,9 @@ var ItemView = Backbone.View.extend({
         if(this.$fileInput[0].files.length > 0) {
             var typeIsValid = false;
 
-            for(var i = 0; i < ['image/jpeg', 'image/pjpeg', 'image/png'].length; i++) {
+            var fileTypes = ['image/jpeg', 'image/pjpeg', 'image/png'];
+
+            for(var i = 0; i < fileTypes.length; i++) {
                 if(this.$fileInput[0].files[0].type === fileTypes[i]) {
                     typeIsValid = true;
                     break;
