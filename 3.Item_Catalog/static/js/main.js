@@ -67,7 +67,7 @@ var CategoryCollection = Backbone.Collection.extend({
         this.userId = userId;
 
         this.trigger('userChanged');
-    }
+    },
 
     // Return all categories for the current user_id
     getByOwner: function() {

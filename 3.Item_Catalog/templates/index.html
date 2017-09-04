@@ -201,14 +201,15 @@
 
                 // Fetch data from server (categories and items)
                 categoryCollection.fetch({
+                    success: function() {
+                        itemCollection.fetch({
+                            error: function() {
+                                window.alert('Failed to fetch items from server');
+                            }
+                        });
+                    },
                     error: function() {
                         window.alert('Failed to fetch categories from server');
-                    }
-                });
-
-                itemCollection.fetch({
-                    error: function() {
-                        window.alert('Failed to fetch items from server');
                     }
                 });
             })();

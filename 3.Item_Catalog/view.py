@@ -75,9 +75,10 @@ def requires_authentication(f):
 def requires_state_consistency(f):
     """Decorator taht checks if request state parameters is correct."""
     def decorator(*args, **kwargs):
-        if ('state' not in request.headers)
+        if ('state' not in request.headers)\
         or (request.headers['state'] != login_session['state']):
-            return Response(error='Invalid state parameter', response_code=401)
+            return Response(error='Invalid state parameter',
+                            response_code=401)
 
         return f(*args, **kwargs)
 

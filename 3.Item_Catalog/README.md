@@ -12,8 +12,9 @@ For these first 4 requirements, I used [Vagrant](https://www.vagrantup.com/) and
 
 You also need these following requirements:
 
-* [Flask-Uploads](http://pythonhosted.org/Flask-Uploads/#flaskext.uploads.configure_uploads) (You may install it using `pip3 install Flask-Uploads`)
-* [Google APIs Client](https://developers.google.com/api-client-library/python/start/installation) library for Python (You may install it by using `pip3 install --upgrade google-api-python-client`);
+* [Flask-Uploads](http://pythonhosted.org/Flask-Uploads/#flaskext.uploads.configure_uploads) (You may install it using `sudo pip3 install Flask-Uploads`);
+* [Psycopg](https://wiki.postgresql.org/wiki/Psycopg2), a PostgreSQL database adapter for the Python (You may install it using `sudo pip3 install psycopg2`)
+* [Google APIs Client](https://developers.google.com/api-client-library/python/start/installation) library for Python (You may install it by using `sudo pip3 install --upgrade google-api-python-client`);
 
 ## Getting Started
 
